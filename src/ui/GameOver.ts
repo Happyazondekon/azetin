@@ -20,6 +20,8 @@ export class GameOver {
 
   private onTitle: () => void = () => location.reload();
   private ending = false;
+  private card = false;
+  private onCard: () => void = () => {};
 
   constructor(parent: HTMLElement, onWake: () => void) {
     this.root = document.createElement('div');
@@ -27,7 +29,7 @@ export class GameOver {
     this.root.innerHTML = `<div class="go-inner"><p class="go-quote"></p><p class="go-fr"></p>
       <button class="go-wake">Wake up</button></div>`;
     parent.appendChild(this.root);
-    this.root.querySelector('.go-wake')!.addEventListener('click', () => (this.ending ? this.onTitle() : onWake()));
+    this.root.querySelector('.go-wake')!.addEventListener('click', () => (this.card ? this.onCard() : this.ending ? this.onTitle() : onWake()));
   }
 
   // Écran de fin : titre de la fin et quelques lignes, puis retour au menu
@@ -38,6 +40,30 @@ export class GameOver {
     this.root.querySelector('.go-wake')!.textContent = 'Return to title';
     this.root.classList.add('on', 'ending');
     this.open = true;
+  }
+
+  // Carte de fin avant le générique : « Continue » (ou Espace) pour lancer les crédits, sinon elle part seule
+  endingCard(title: string, lines: string[], seconds: number): Promise<void> {
+    this.showEnding(title, lines);
+    const btn = this.root.querySelector<HTMLButtonElement>('.go-wake')!;
+    btn.textContent = 'Continue';
+    this.card = true;
+    return new Promise((res) => {
+      this.onCard = () => finish();
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        removeEventListener('keydown', key);
+        this.card = false;
+        this.hide();
+        setTimeout(res, 900);
+      };
+      const key = (e: KeyboardEvent) => { if (e.code === 'Space' || e.code === 'Enter') finish(); };
+      const timer = setTimeout(finish, seconds * 1000);
+      setTimeout(() => addEventListener('keydown', key), 1200);
+    });
   }
 
   show(cause: DeathCause): void {

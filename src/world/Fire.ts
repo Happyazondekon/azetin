@@ -235,6 +235,12 @@ export class FireSystem {
   }
 
   /** L'explosion du dépôt : boule de feu, éclair, onde de choc, débris, champignon. */
+  // Une explosion fantôme sous le sol, le temps de préchauffer ses shaders au chargement
+  prewarm(): () => void {
+    const e = new Explosion(this.scene, new THREE.Vector3(0, -60, 0), 0.05, this);
+    return () => e.dispose();
+  }
+
   explode(at: THREE.Vector3, scale = 1): void {
     this.explosions.push(new Explosion(this.scene, at, scale, this));
   }
@@ -384,6 +390,12 @@ class Explosion {
       this.debris.push({ m, v: new THREE.Vector3(Math.cos(a) * sp, (10 + Math.random() * 14) * s, Math.sin(a) * sp), r: new THREE.Vector3(Math.random() * 8, Math.random() * 8, Math.random() * 8) });
     }
     fx.burstEmbers(at.clone().setY(2), 260, 6 * s, 9 * s);
+  }
+
+  dispose(): void {
+    this.scene.remove(this.ball, this.ring, ...this.debris.map((d) => d.m));
+    this.light.intensity = 0;
+    this.done = true;
   }
 
   update(dt: number): void {

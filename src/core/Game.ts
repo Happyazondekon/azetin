@@ -223,7 +223,12 @@ export class Game {
     this.interactables = this.buildInteractables();
     this.ready = true;
     // compile les shaders tout de suite (pas de saccade la première fois qu'on voit un feu ou un personnage)
-    try { this.renderer.compile(this.scene, this.camera); } catch { /* pas grave */ }
+    const unboom = this.world.fx.prewarm();
+    const zoo = this.materialZoo();
+    this.scene.add(zoo);
+    await this.warmup(this.scene);
+    this.scene.remove(zoo);
+    unboom();
     this.menu.setLoading(null);
     this.renderer.setAnimationLoop(() => this.frame());
   }
@@ -1768,15 +1773,17 @@ export class Game {
     this.menu.show(hasSave());
   }
 
-  private async finalScreen(title: string, lines: string[], credits = true): Promise<void> {
+  // Écran de la fin (titre + quelques lignes), puis le générique, puis retour direct à l'accueil
+  private async finalScreen(title: string, lines: string[], dawn = false): Promise<void> {
     setFlag('ended');
     clearSave();
-    if (credits) await this.rollCredits(false, 'Azé-tin is waiting.');
-    this.mode = 'dead';
+    this.mode = 'cine';
     this.hud.hideAll();
     this.hud.setKaolin(null);
     document.exitPointerLock();
-    this.gameOver.showEnding(title, lines);
+    await this.gameOver.endingCard(title, lines, 16);
+    await this.rollCredits(dawn, dawn ? 'Azé-tin sleeps in peace.' : 'Azé-tin is waiting.');
+    location.reload(); // l'accueil, avec un village tout neuf
   }
 
   // ---------------------------------------------------------------- choix IV : le rite
@@ -2040,6 +2047,11 @@ export class Game {
     const fired = new Set<string>();
     const at = (k: string, t: number, now: number, f: () => void) => { if (now >= t && !fired.has(k)) { fired.add(k); f(); } };
     let done = false;
+    // sous le flash blanc : on compile tout de suite les âmes en lumière (personnages animés + glow)
+    const swap: [THREE.Mesh, THREE.Material | THREE.Material[]][] = [];
+    for (const so of souls) so.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) { swap.push([m, m.material]); m.material = glow; } });
+    void this.warmup(this.scene, true);
+    for (const [m, mat] of swap) m.material = mat;
     this.director.play({
       duration: 64,
       update: (t, dt) => {
@@ -2086,7 +2098,7 @@ export class Game {
         if (done) return;
         done = true;
         markEnding('healer');
-        void this.rollCredits(true, 'Azé-tin sleeps in peace.').then(() => this.postCredits());
+        this.postCredits();
       },
     });
   }
@@ -2189,7 +2201,7 @@ export class Game {
           if (done) return;
           done = true;
           void this.finalScreen('Ending IV — The Last Healer', ['The rite frees the souls. Mama Dossi and the villagers rise into the light. Houngbo is judged by the ancestors.',
-            'Ayaba says goodbye. A shoot of iroko breaks through the stump of Loko.', 'Happy calls his mother: “I’m going to stay a little while.”', 'One year later, a car breaks down in front of the sign — repainted. A man with a calabash walks up, a lamp in his hand.'], false);
+            'Ayaba says goodbye. A shoot of iroko breaks through the stump of Loko.', 'Happy calls his mother: “I’m going to stay a little while.”', 'One year later, a car breaks down in front of the sign — repainted. A man with a calabash walks up, a lamp in his hand.'], true);
         },
       });
     }, 1300);
@@ -2270,8 +2282,7 @@ export class Game {
     else if (this.mode === 'playing') this.updatePlaying(dt);
     else if (this.mode === 'cine') {
       if (this.input.wasPressed('Space')) this.director.skip();
-      this.flash.visible = false;
-      this.fill.visible = false;
+      this.lightsOff();
       this.mirror.raised = 0;
       this.hud.setPrompt(null);
     }
@@ -2304,7 +2315,12 @@ export class Game {
     let pr = this.pixelRatio;
     if (mean > 1 / 28 && pr > 0.6) pr = Math.max(0.6, pr - 0.15);
     else if (mean < 1 / 55 && pr < max) pr = Math.min(max, pr + 0.1);
-    if (mean > 1 / 22 && pr <= 0.6 && this.renderer.shadowMap.enabled) { this.renderer.shadowMap.enabled = false; this.flash.castShadow = false; }
+    if (mean > 1 / 22 && pr <= 0.6 && this.flash.shadow.mapSize.x > 256) {
+      // dernier recours : ombre du flash plus petite (couper les ombres recompilerait tous les shaders)
+      this.flash.shadow.mapSize.set(256, 256);
+      this.flash.shadow.map?.dispose();
+      this.flash.shadow.map = null;
+    }
     if (pr !== this.pixelRatio) {
       this.pixelRatio = pr;
       this.renderer.setPixelRatio(pr);
@@ -2318,9 +2334,77 @@ export class Game {
     const a = 0.55 + Math.sin(this.time * 0.05) * 0.35;
     this.camera.position.set(f.x + Math.sin(a) * 8.5, 1.5 + Math.sin(this.time * 0.13) * 0.15, f.z + Math.cos(a) * 8.5);
     this.camera.lookAt(f);
-    this.flash.visible = false;
-    this.fill.visible = false;
+    this.lightsOff();
     this.mirror.raised = 0;
+  }
+
+  // Toutes les variantes de matériaux créées en cours de jeu (rite, fin IV, fête) : compilées d'avance
+  private materialZoo(): THREE.Group {
+    const g = new THREE.Group();
+    g.position.set(0, -80, 0);
+    const geo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+    const tex = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+    tex.needsUpdate = true;
+    const mats: THREE.Material[] = [];
+    for (const side of [THREE.FrontSide, THREE.DoubleSide]) {
+      for (const map of [null, tex]) {
+        mats.push(new THREE.MeshBasicMaterial({ side, map, transparent: true }));
+        mats.push(new THREE.MeshStandardMaterial({ side, map, emissive: 0x111111 }));
+        mats.push(new THREE.MeshStandardMaterial({ side, map, flatShading: true }));
+        mats.push(new THREE.MeshLambertMaterial({ side, map }));
+      }
+    }
+    for (const m of mats) g.add(new THREE.Mesh(geo, m));
+    const pg = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3));
+    g.add(new THREE.Points(pg, new THREE.PointsMaterial({ size: 0.1, transparent: true })));
+    g.add(new THREE.Points(pg, new THREE.PointsMaterial({ size: 0.1, map: tex, transparent: true, vertexColors: true })));
+    g.add(new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true })));
+    g.add(new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true })));
+    return g;
+  }
+
+  // Préchauffage des shaders : tout est rendu une fois, caché derrière l'écran de chargement ou un fondu,
+  // dans toutes les variantes (écran, ombres, rétroviseur). Plus aucune compilation en pleine partie.
+  private warmRT = new THREE.WebGLRenderTarget(64, 64);
+  private async warmup(root: THREE.Object3D, sync = false): Promise<void> {
+    const shown: THREE.Object3D[] = [];
+    const culled: THREE.Object3D[] = [];
+    root.traverse((o) => {
+      if (!o.visible) { o.visible = true; shown.push(o); }
+      if (o.frustumCulled) { o.frustumCulled = false; culled.push(o); }
+    });
+    const mask = this.camera.layers.mask;
+    this.camera.layers.enableAll();
+    const fi = this.flash.intensity, fa = this.flash.shadow.autoUpdate;
+    this.flash.intensity = 1;
+    this.flash.shadow.autoUpdate = true;
+    try {
+      // en cours de partie : tout en une fois (rien ne doit s'afficher entre-temps)
+      if (sync) this.renderer.compile(root, this.camera, this.scene);
+      else await this.renderer.compileAsync(root, this.camera, this.scene);
+      this.renderer.setRenderTarget(this.warmRT);
+      this.renderer.render(this.scene, this.camera);
+      this.renderer.setRenderTarget(null);
+      this.renderer.render(this.scene, this.camera);
+      // le rétroviseur : sa propre cible de rendu et son cadre par-dessus l'écran
+      const r = this.mirror.raised;
+      this.mirror.raised = 1;
+      this.mirror.render(this.renderer, this.scene);
+      this.mirror.raised = r;
+    } catch { /* pas grave */ }
+    for (const o of shown) o.visible = false;
+    for (const o of culled) o.frustumCulled = true;
+    this.camera.layers.mask = mask;
+    this.flash.intensity = fi;
+    this.flash.shadow.autoUpdate = fa;
+  }
+
+  // Ne JAMAIS cacher une lumière (visible=false) : three.js recompilerait tous les shaders du jeu
+  // (gel de plusieurs secondes sous Windows). On coupe l'intensité, et l'ombre du flash ne se recalcule plus.
+  private lightsOff(): void {
+    this.flash.intensity = 0;
+    this.fill.intensity = 0;
+    this.flash.shadow.autoUpdate = false;
   }
 
   private updatePlaying(dt: number): void {
@@ -2347,12 +2431,12 @@ export class Game {
       this.line('happy_flash_dead', 7);
     }
     // Le flash du téléphone baisse avec la batterie : plein jusqu'à 60 %, puis il faiblit, jaunit et vacille sous 15 %
-    this.flash.visible = this.fill.visible = this.flashOn;
+    this.flash.shadow.autoUpdate = this.flashOn;
     const charge = THREE.MathUtils.clamp(story.battery / 60, 0, 1);
     const k = 0.18 + 0.82 * Math.pow(charge, 0.8);
     const low = story.battery < 15;
     if (this.blackout > 0) this.blackout -= dt;
-    const flicker = this.blackout > 0 ? 0 : low && Math.random() < 0.07 ? 0.15 : 1;
+    const flicker = !this.flashOn || this.blackout > 0 ? 0 : low && Math.random() < 0.07 ? 0.15 : 1;
     this.flash.intensity = 55 * k * flicker;
     this.flash.distance = 14 + 18 * k;
     this.fill.intensity = 6 * k * flicker;
