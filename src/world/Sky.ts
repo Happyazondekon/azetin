@@ -27,6 +27,9 @@ const KEYS: Key[] = [
   { m: 24 * 60, top: 0x04081a, hor: 0x0c1222, fog: 0x060810, hemiSky: 0x34466a, hemiGround: 0x120c08, hemi: 1.3, sun: 0, moon: 1.0, stars: 1, fogD: 0.04 },
   { m: 24 * 60 + 4 * 60 + 30, top: 0x0a1028, hor: 0x1a1a30, fog: 0x0a0a14, hemiSky: 0x3a4a6a, hemiGround: 0x120c08, hemi: 1.0, sun: 0, moon: 0.5, stars: 0.8, fogD: 0.04 },
   { m: 24 * 60 + 5 * 60 + 30, top: 0x4a6a9a, hor: 0xf0b080, fog: 0x8a7a70, hemiSky: 0xffd8b0, hemiGround: 0x3a2a1a, hemi: 1.7, sun: 1.8, moon: 0.1, stars: 0, fogD: 0.02 },
+  // le jour (seulement après la vraie fin : le village guéri, au soleil)
+  { m: 24 * 60 + 7 * 60, top: 0x4a86c8, hor: 0xcfe0f0, fog: 0xb8c8d0, hemiSky: 0xfff0d8, hemiGround: 0x5a4028, hemi: 2.2, sun: 3.0, moon: 0, stars: 0, fogD: 0.008 },
+  { m: 24 * 60 + 9 * 60, top: 0x3a7ac8, hor: 0xd8e8f4, fog: 0xc0d0d8, hemiSky: 0xffffff, hemiGround: 0x6a4a30, hemi: 2.4, sun: 3.4, moon: 0, stars: 0, fogD: 0.006 },
 ];
 
 const c1 = new THREE.Color(), c2 = new THREE.Color();

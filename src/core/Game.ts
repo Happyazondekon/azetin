@@ -19,6 +19,7 @@ import { buildAct2Props, type Pickup } from '../world/Act2Props';
 import type { FireHandle } from '../world/Fire';
 import { instance, type ModelName, type Models } from '../world/Assets';
 import { markEnding } from '../ui/Endings';
+import { Credits } from '../ui/Credits';
 import { LAYER_SEEN, LAYER_TRUTH } from '../world/Village';
 import LINES from '../story/lines.json';
 import { buildPerson, type Person } from '../world/People';
@@ -1673,7 +1674,7 @@ export class Game {
       end: () => {
         if (stele === null) this.steleName('HAPPY');
         markEnding('ashes');
-        this.finalScreen('Ending III — The Ashes', ['Houngbo laughs: “Thank you, traveller.” A second explosion. White.', 'In the morning, the stone at the entrance carries one more name: HAPPY.', 'Azé-tin keeps its secret. And its chief.']);
+        void this.finalScreen('Ending III — The Ashes', ['Houngbo laughs: “Thank you, traveller.” A second explosion. White.', 'In the morning, the stone at the entrance carries one more name: HAPPY.', 'Azé-tin keeps its secret. And its chief.']);
       },
     });
   }
@@ -1702,9 +1703,20 @@ export class Game {
     return m;
   }
 
-  private finalScreen(title: string, lines: string[]): void {
+  // Le générique (braises et cendre ; à l'aube pour la vraie fin), puis l'écran de fin
+  private async rollCredits(dawn: boolean, last: string): Promise<void> {
+    this.mode = 'cine';
+    this.hud.hideAll();
+    this.hud.setKaolin(null);
+    this.audio.loop('credits', 0.6, dawn ? 'music/dawn.mp3' : 'music/theme.mp3');
+    await new Credits().play(dawn, last);
+    this.audio.loop('credits', 0, dawn ? 'music/dawn.mp3' : 'music/theme.mp3');
+  }
+
+  private async finalScreen(title: string, lines: string[], credits = true): Promise<void> {
     setFlag('ended');
     clearSave();
+    if (credits) await this.rollCredits(false, 'Azé-tin is waiting.');
     this.mode = 'dead';
     this.hud.hideAll();
     this.hud.setKaolin(null);
@@ -1875,9 +1887,9 @@ export class Game {
 
   private drawChant(): void {
     const r = this.rite!;
-    const glyph: Record<string, string> = { up: '↑', down: '↓', left: '←', right: '→' };
+    const rot: Record<string, number> = { up: 0, right: 90, down: 180, left: 270 };
     const names = ['Moon liana', 'Ash grass', 'Hornbill flower'];
-    r.ui.innerHTML = `<small>Verse ${r.verse + 1}/3 — ${names[r.verse]}</small><div>${r.seq.map((k, i) => `<b class="${i < r.idx ? 'ok' : i === r.idx ? 'now' : ''}">${glyph[k]}</b>`).join('')}</div>
+    r.ui.innerHTML = `<small>Verse ${r.verse + 1}/3 — ${names[r.verse]}</small><div>${r.seq.map((k, i) => `<b class="${i < r.idx ? 'ok' : i === r.idx ? 'now' : ''}"><img src="${import.meta.env.BASE_URL}ui/icon-arrow.png" style="transform:rotate(${rot[k]}deg)" alt=""></b>`).join('')}</div>
       <em>Arrows or ZQSD / WASD · Q = kaolin when he strikes</em>${r.strikeWarn > 0 ? '<strong>HOUNGBO STRIKES — THROW KAOLIN (Q)!</strong>' : ''}`;
     r.ui.classList.add('on');
   }
@@ -1974,17 +1986,17 @@ export class Game {
     const at = (k: string, t: number, now: number, f: () => void) => { if (now >= t && !fired.has(k)) { fired.add(k); f(); } };
     let done = false;
     this.director.play({
-      duration: 46,
+      duration: 64,
       update: (t, dt) => {
         h?.update(dt);
-        // l'aube se lève pendant toute la scène
-        story.minutes = Math.min(29 * 60 + 40, 28 * 60 + 30 + t * 4);
+        // l'aube se lève, puis le plein jour revient sur Azé-tin
+        story.minutes = t < 24 ? 28 * 60 + 30 + t * 3 : t < 32 ? 29 * 60 + 42 + (t - 24) * 10 : 32 * 60 + 30;
         if (t < 14) {
           // les âmes s'élèvent en lumière au-dessus de la station
           this.camera.position.set(31, 2 + t * 0.15, 4);
           this.camera.lookAt(38.6, 2 + t * 0.6, -6.6);
           for (const s of souls) {
-            if (t > 2 && !s.userData.freed) { s.userData.freed = true; s.traverse((o) => { if ((o as THREE.Mesh).isMesh) { (o as THREE.Mesh).material = glow; o.layers.enableAll(); } }); }
+            if (t > 2 && !s.userData.freed) { s.userData.freed = true; s.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.userData.orig ??= (o as THREE.Mesh).material; (o as THREE.Mesh).material = glow; o.layers.enableAll(); } }); }
             if (s.userData.freed) s.position.y += dt * (0.6 + (s.id % 5) * 0.15);
           }
         }
@@ -1997,19 +2009,101 @@ export class Game {
         if (t >= 14 && t < 26) { this.camera.position.set(1.2, 1.3, -36.2); this.camera.lookAt(1, 1.0, -40); }
         if (ay && t > 22 && t < 26) { ay.root.position.z -= dt * 1; ay.root.scale.setScalar(Math.max(0.01, 1 - (t - 22) / 4)); }
         // une pousse d'iroko perce la souche de Loko
-        if (t >= 26 && t < 36) { this.camera.position.set(1.8, 2.7, -17.4); this.camera.lookAt(0.2, 2.35, -19.8); sprout.scale.setScalar(Math.min(1, (t - 26) / 6)); }
+        if (t >= 26 && t < 32) { this.camera.position.set(1.8, 2.7, -17.4); this.camera.lookAt(0.2, 2.35, -19.8); sprout.scale.setScalar(Math.min(1, (t - 26) / 5)); }
         at('hornbill', 28, t, () => this.audio.sfx('hornbill', { gain: 1 }));
+        // ---- le village tel qu'il aurait dû être : au grand jour, tout le monde danse et rit
+        at('joyIn', 31.6, t, () => this.whiteOut(true));
+        at('joy', 32.2, t, () => { this.setupJoy(souls); this.whiteOut(false); });
+        if (t >= 32 && t < 50 && this.joy) {
+          for (const p of this.joy.people) p.update(dt);
+          const a = 0.6 + (t - 32) * 0.07;
+          this.camera.position.set(Math.sin(a) * 13, 3.2 + Math.sin((t - 32) * 0.3) * 1.2, 9.4 + Math.cos(a) * 13);
+          this.camera.lookAt(0, 1.2, 9.4);
+          if (Math.random() < dt * 0.8) this.audio.voiceMix('ha ha ha', Math.random() < 0.5 ? 'f' : 'm', { gain: 0.5, pan: Math.random() * 2 - 1, rate: 1.1 });
+        }
+        at('joyOut', 49.4, t, () => { this.audio.sfx('souls', { gain: 1 }); this.whiteOut(true); });
+        at('joyEnd', 50.2, t, () => { this.clearJoy(); this.whiteOut(false); });
         // Happy appelle sa mère : le réseau revient avec le jour
-        at('call', 36, t, () => { this.phone.notify('phone', 'Mum ❤️', 'Calling…', 5); this.line('happy_mom', 8); });
-        if (t >= 36) { this.camera.position.set(2, 1.65, -10 + (t - 36) * 0.4); this.camera.lookAt(0, 6 + (t - 36) * 0.6, -60); }
+        at('call', 52, t, () => { this.phone.notify('phone', 'Mum', 'Calling…', 5); this.line('happy_mom', 8); });
+        if (t >= 50.2) { this.camera.position.set(2, 1.65, -10 + (t - 50) * 0.4); this.camera.lookAt(0, 6 + (t - 50) * 0.5, -60); }
       },
       end: () => {
         if (done) return;
         done = true;
         markEnding('healer');
-        this.postCredits();
+        void this.rollCredits(true, 'Azé-tin sleeps in peace.').then(() => this.postCredits());
       },
     });
+  }
+
+  // ---- Le village guéri : chacun reprend son vrai visage, au soleil, et la fête recommence — joyeuse cette fois
+  private joy: { people: Person[]; props: THREE.Object3D[]; fires: FireHandle[] } | null = null;
+  private setupJoy(souls: THREE.Object3D[]): void {
+    const w = this.world;
+    const props: THREE.Object3D[] = [];
+    const people: Person[] = [];
+    for (const s of souls) s.traverse((o) => { if (o.userData.orig) (o as THREE.Mesh).material = o.userData.orig; });
+    for (const st of this.statues) st.p.root.visible = false;
+    for (const e of this.enemies.list) e.person.root.visible = false;
+    if (this.houngbo) this.houngbo.root.visible = false;
+    w.followGaze = false;
+    // les villageois, Mama Dossi et Ayaba dansent autour du feu de la place
+    const all = Object.entries(w.people).filter(([id]) => id !== 'kossi').map(([, p]) => p).concat(this.enemies.list.map((e) => e.person));
+    all.forEach((p, i) => {
+      p.root.visible = true;
+      p.root.scale.setScalar(1);
+      p.root.position.y = 0;
+      const ring = i < 10 ? 3.3 : 5.4;
+      const a = (i / Math.min(10, all.length)) * Math.PI * 2 + (i >= 10 ? 0.3 : 0);
+      p.root.position.set(Math.cos(a) * ring, 0, 9.4 + Math.sin(a) * ring);
+      p.root.rotation.y = Math.atan2(-Math.cos(a), -Math.sin(a));
+      p.play(i % 4 === 3 ? 'Idle_Talking_Loop' : 'Dance_Loop', 0.1);
+      p.mixers.forEach((m) => (m.timeScale = 0.9 + (i % 3) * 0.1));
+      people.push(p);
+    });
+    // Kossi, enfin, sourit : il regarde danser les autres
+    const k = w.people['kossi'];
+    if (k) { k.root.position.set(-6.5, 0, 12.5); k.root.rotation.y = Math.atan2(6.5, -3.1); k.play('Idle_Talking_Loop'); people.push(k); }
+    // Dah Agossou, en blanc, bénit la fête près des tambours
+    const ag = buildPerson(this.models, { id: 'agossou-joy', sex: 'm', height: 1.74, skin: '#3a2618', top: 'bomba', wax: ['#efe9dc', '#d8d0c0', '#c8bfae'], pants: '#e8e2d4', beard: true, azevi: false, pose: 'Idle_Loop' });
+    if (ag) { ag.root.position.set(4.5, 0, 14.5); ag.root.rotation.y = Math.atan2(-4.5, -5.1); ag.play('Interact'); this.scene.add(ag.root); props.push(ag.root); people.push(ag); }
+    // les tambours et les fanions jaune-vert-rouge
+    for (const [x, z, sc] of [[2.6, 12.8, 1], [3.4, 12.1, 0.85]]) {
+      const d = instance(this.models, 'az-drum', sc);
+      if (d) { d.position.set(x, 0, z); this.scene.add(d); props.push(d); }
+    }
+    const flagMats = [0x1f7a3a, 0xe0b020, 0xc0201a].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8, side: THREE.DoubleSide }));
+    const poles: [number, number][] = [[-5.5, 4], [5.5, 4], [5.5, 15], [-5.5, 15]];
+    for (let i = 0; i < 4; i++) {
+      const [x0, z0] = poles[i], [x1, z1] = poles[(i + 1) % 4];
+      for (let n = 1; n < 12; n++) {
+        const u = n / 12;
+        const f = new THREE.Mesh(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-0.13, 0, 0), new THREE.Vector3(0.13, 0, 0), new THREE.Vector3(0, -0.32, 0)]), flagMats[n % 3]);
+        f.geometry.computeVertexNormals();
+        f.position.set(x0 + (x1 - x0) * u, 3.25 - Math.sin(u * Math.PI) * 0.6, z0 + (z1 - z0) * u);
+        f.rotation.y = Math.atan2(x1 - x0, z1 - z0) + Math.PI / 2;
+        this.scene.add(f);
+        props.push(f);
+      }
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 3.4, 6), new THREE.MeshStandardMaterial({ color: 0x5a3a20 }));
+      pole.position.set(x0, 1.7, z0);
+      this.scene.add(pole);
+      props.push(pole);
+    }
+    // plus de cendre : les feux des ruines s'éteignent, le feu de la place est un feu de fête
+    w.flameScale = [1.2, 0, 0];
+    for (const l of this.hutGlow) l.visible = false;
+    this.audio.loop('festival', 0.7);
+    this.audio.loop('fire', 0);
+    this.joy = { people, props, fires: [] };
+  }
+
+  private clearJoy(): void {
+    if (!this.joy) return;
+    for (const p of this.joy.people) p.root.visible = false;
+    for (const o of this.joy.props) this.scene.remove(o);
+    this.audio.loop('festival', 0);
+    this.joy = null;
   }
 
   // Scène après le générique : un an plus tard, quelqu'un tombe en panne devant le panneau…
@@ -2039,8 +2133,8 @@ export class Game {
         end: () => {
           if (done) return;
           done = true;
-          this.finalScreen('Ending IV — The Last Healer', ['The rite frees the souls. Mama Dossi and the villagers rise into the light. Houngbo is judged by the ancestors.',
-            'Ayaba says goodbye. A shoot of iroko breaks through the stump of Loko.', 'Happy calls his mother: “I’m going to stay a little while.”', 'One year later, a car breaks down in front of the sign — repainted. A man with a calabash walks up, a lamp in his hand.']);
+          void this.finalScreen('Ending IV — The Last Healer', ['The rite frees the souls. Mama Dossi and the villagers rise into the light. Houngbo is judged by the ancestors.',
+            'Ayaba says goodbye. A shoot of iroko breaks through the stump of Loko.', 'Happy calls his mother: “I’m going to stay a little while.”', 'One year later, a car breaks down in front of the sign — repainted. A man with a calabash walks up, a lamp in his hand.'], false);
         },
       });
     }, 1300);
@@ -2076,12 +2170,12 @@ export class Game {
   private ending(dawn = false): void {
     if (story.marque >= 3 || dawn) {
       markEnding('azevi');
-      this.finalScreen('Ending II — The Azévi', dawn
+      void this.finalScreen('Ending II — The Azévi', dawn
         ? ['Dawn finds you still in Azé-tin. You sit down in front of a hut, and you cannot remember why you wanted to leave.', 'Later, headlights on the road. You stand up. You walk towards them, smiling.']
         : ['The engine coughs, then nothing. In the rear-view mirror, your own face is ash.', 'Later, headlights on the road. You stand up. You walk towards them, smiling.']);
     } else {
       markEnding('survivor');
-      this.finalScreen('Ending I — The Survivor', ['You drive towards the dawn. The radio comes back. You call your mother, and you laugh, and you cannot stop.',
+      void this.finalScreen('Ending I — The Survivor', ['You drive towards the dawn. The radio comes back. You call your mother, and you laugh, and you cannot stop.',
         'In the rear-view mirror, on the back seat, an owl is watching you.', 'Azé-tin is waiting for the next one.']);
     }
   }

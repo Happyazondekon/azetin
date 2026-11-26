@@ -82,53 +82,69 @@ export function buildVillage(scene: THREE.Scene, models: Models): World {
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
-  const road = new THREE.Mesh(new THREE.PlaneGeometry(5, 75), mat.road);
-  road.rotation.x = -Math.PI / 2;
-  road.position.set(0, 0.01, 58);
-  road.receiveShadow = true;
-  scene.add(road);
-  // Chemins de terre battue entre les lieux : plus clairs que le sol, on les suit à la lune et à la torche
-  const pathTex = (() => {
-    const cv = document.createElement('canvas');
-    cv.width = 64; cv.height = 64;
-    const g = cv.getContext('2d')!;
-    const grd = g.createLinearGradient(0, 0, 64, 0);
-    grd.addColorStop(0, 'rgba(255,255,255,0)');
-    grd.addColorStop(0.25, 'rgba(255,255,255,0.9)');
-    grd.addColorStop(0.75, 'rgba(255,255,255,0.9)');
-    grd.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = grd;
-    g.fillRect(0, 0, 64, 64);
-    for (let i = 0; i < 140; i++) { g.fillStyle = `rgba(0,0,0,${Math.random() * 0.25})`; g.fillRect(Math.random() * 64, Math.random() * 64, 2, 2); }
-    const t = new THREE.CanvasTexture(cv);
-    t.wrapT = THREE.RepeatWrapping;
-    return t;
-  })();
-  const pathMat = new THREE.MeshStandardMaterial({ color: 0x7a4428, roughness: 1, alphaMap: pathTex, transparent: true, depthWrite: false });
-  for (const [, , pts] of PATHS) {
+  // Pistes de latérite : texture faite dans la chaîne Blender (tools/blender/roadtex.py) —
+  // ornières, cailloux, flaques, bords d'herbe ; tracés lissés en courbes, légèrement bombés au milieu.
+  const roadTex = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}textures/road.png`);
+  roadTex.colorSpace = THREE.SRGBColorSpace;
+  roadTex.wrapT = THREE.RepeatWrapping;
+  roadTex.anisotropy = 8;
+  const roadMat = new THREE.MeshStandardMaterial({ map: roadTex, roughness: 0.95, side: THREE.DoubleSide, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+  const puddleMat = new THREE.MeshStandardMaterial({ color: 0x0a0d12, roughness: 0.05, metalness: 0.85, transparent: true, opacity: 0.85, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 });
+  const piste = (pts: [number, number][], width: number, seed: number) => {
+    const curve = new THREE.CatmullRomCurve3(pts.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, 'centripetal');
+    const len = curve.getLength();
+    const n = Math.max(4, Math.ceil(len / 0.6));
     const pos: number[] = [], uv: number[] = [], idx: number[] = [];
-    let run = 0;
-    pts.forEach(([x, z], i) => {
-      const [px, pz] = pts[Math.max(0, i - 1)], [nx, nz] = pts[Math.min(pts.length - 1, i + 1)];
-      let dx = nx - px, dz = nz - pz;
-      const L = Math.hypot(dx, dz) || 1;
-      dx /= L; dz /= L;
-      if (i) run += Math.hypot(x - pts[i - 1][0], z - pts[i - 1][1]);
-      const w = 0.9;
-      pos.push(x - dz * w, 0.02, z + dx * w, x + dz * w, 0.02, z - dx * w);
-      uv.push(0, run / 3, 1, run / 3);
-      if (i) { const b = (i - 1) * 2; idx.push(b, b + 2, b + 1, b + 1, b + 2, b + 3); }
-    });
+    const cols = [0, 0.25, 0.5, 0.75, 1];
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      const p = curve.getPointAt(t);
+      const tg = curve.getTangentAt(t);
+      const nx = -tg.z, nz = tg.x;
+      const w = width * (0.92 + 0.08 * Math.sin(t * len * 0.37 + seed));
+      for (const c of cols) {
+        const o = (c - 0.5) * w;
+        const crown = 0.035 * (1 - Math.abs(c - 0.5) * 2);
+        pos.push(p.x + nx * o, 0.02 + crown, p.z + nz * o);
+        uv.push(c, (t * len) / (width * 2.4));
+      }
+      if (i) {
+        const b = (i - 1) * cols.length, k = i * cols.length;
+        for (let j = 0; j < cols.length - 1; j++) idx.push(b + j, k + j, b + j + 1, b + j + 1, k + j, k + j + 1);
+      }
+    }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     geo.setIndex(idx);
     geo.computeVertexNormals();
-    const m = new THREE.Mesh(geo, pathMat);
+    const m = new THREE.Mesh(geo, roadMat);
     m.receiveShadow = true;
     m.renderOrder = 1;
     scene.add(m);
-  }
+    // touffes d'herbe le long des bords, et quelques flaques où la lune se reflète
+    const r = rng(seed);
+    for (let d = 1; d < len; d += 2.2 + r() * 2) {
+      const t = d / len;
+      const p = curve.getPointAt(t), tg = curve.getTangentAt(t);
+      const side = r() < 0.5 ? -1 : 1;
+      const o = side * (width * 0.5 + 0.15 + r() * 0.5);
+      const gx = p.x - tg.z * o, gz = p.z + tg.x * o;
+      put(r() < 0.25 ? 'tr-bush' : 'tr-grass', gx, gz, r() * 6.28, 0.5 + r() * 0.5, false);
+      if (width > 3 && r() < 0.12) {
+        const pd = new THREE.Mesh(new THREE.CircleGeometry(0.4 + r() * 0.5, 14), puddleMat);
+        pd.rotation.x = -Math.PI / 2;
+        pd.scale.set(1.6, 1, 1);
+        pd.rotation.z = Math.atan2(tg.x, tg.z);
+        pd.position.set(p.x + (r() - 0.5) * width * 0.4, 0.06, p.z);
+        pd.renderOrder = 2;
+        scene.add(pd);
+      }
+    }
+  };
+  // la grande piste qui vient du sud (là où le 4×4 est tombé en panne), puis les chemins du village
+  piste([[1.8, 98], [1.4, 84], [1.2, 72], [0.6, 63], [0.2, 52], [-0.2, 43], [-0.5, 34]], 4.6, 3);
+  PATHS.forEach(([a, b, pts], i) => a !== 'car' && piste(pts, (a === 'stele' && b === 'plaza') ? 3.4 : a === 'plaza' && b === 'station' ? 2.6 : 2.1, 11 + i));
 
   const lagoon = new THREE.Mesh(new THREE.PlaneGeometry(200, 90), mat.water);
   lagoon.rotation.x = -Math.PI / 2;

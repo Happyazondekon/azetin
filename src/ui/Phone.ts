@@ -21,25 +21,8 @@ export interface PhoneActions {
 
 type Screen = 'home' | 'map' | 'notes' | 'photos' | 'photo' | 'messages' | 'thread' | 'memos' | 'bag' | 'endings' | 'settings' | 'pause' | 'phone' | 'camera';
 
-// Icônes (SVG en ligne, blanc sur dégradé) — dessinées pour le jeu
-const ICON: Record<string, string> = {
-  map: '<path d="M12 2.5c-3.6 0-6.5 2.8-6.5 6.4 0 4.6 6.5 12.6 6.5 12.6s6.5-8 6.5-12.6c0-3.6-2.9-6.4-6.5-6.4z" fill="#fff"/><circle cx="12" cy="9" r="2.4" fill="#2f9e5a"/>',
-  notes: '<rect x="5" y="4" width="14" height="16" rx="2" fill="#fff"/><path d="M8 9h8M8 12.5h8M8 16h5" stroke="#e8b62c" stroke-width="1.6" stroke-linecap="round"/>',
-  photos: '<g transform="translate(12 12)">' + [0, 45, 90, 135, 180, 225, 270, 315].map((a, i) => `<ellipse rx="2.6" ry="5.6" transform="rotate(${a}) translate(0 -4.6)" fill="${['#f4a52a', '#f06a3a', '#e0457a', '#a356d8', '#4d7ef0', '#3cb4e6', '#46c27a', '#c6d83a'][i]}" opacity="0.92"/>`).join('') + '</g>',
-  messages: '<path d="M12 4.5c-4.7 0-8.5 3.1-8.5 7 0 2.2 1.2 4.1 3.1 5.4-.2 1.3-.9 2.5-1.9 3.3 1.9 0 3.6-.7 4.8-1.6.8.2 1.6.3 2.5.3 4.7 0 8.5-3.1 8.5-7s-3.8-7.4-8.5-7.4z" fill="#fff"/>',
-  memos: '<path d="M4 12h1.5M7 8.5v7M10 6v12M13 9v6M16 7v10M19 10.5v3" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>',
-  bag: '<path d="M6.5 8.5h11l-1 11h-9z" fill="#fff"/><path d="M9 8.5V7a3 3 0 0 1 6 0v1.5" stroke="#fff" stroke-width="1.6" fill="none"/>',
-  endings: '<path d="M12 3l1.8 6.2H20l-5 3.8 1.9 6.2L12 15.4l-4.9 3.8L9 13 4 9.2h6.2z" fill="#f3d27a"/>',
-  settings: '<circle cx="12" cy="12" r="3" fill="none" stroke="#fff" stroke-width="1.8"/><path d="M12 3.5v2.5M12 18v2.5M3.5 12H6M18 12h2.5M6 6l1.8 1.8M16.2 16.2 18 18M6 18l1.8-1.8M16.2 7.8 18 6" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>',
-  phone: '<path d="M7.2 3.8c.6-.4 1.4-.3 1.8.3l1.7 2.6c.3.5.3 1.2-.1 1.6l-1.2 1.2c.9 1.9 2.4 3.4 4.3 4.3l1.2-1.2c.4-.4 1.1-.5 1.6-.1l2.6 1.7c.6.4.7 1.2.3 1.8l-1 1.5c-.6.9-1.7 1.3-2.7 1-5.3-1.4-9.4-5.5-10.8-10.8-.3-1 .1-2.1 1-2.7z" fill="#fff"/>',
-  camera: '<rect x="3.5" y="7" width="17" height="12" rx="2.5" fill="#fff"/><path d="M9 7l1.3-2h3.4L15 7" fill="#fff"/><circle cx="12" cy="13" r="3.4" fill="#4a4f58"/><circle cx="12" cy="13" r="2" fill="#9aa3af"/>',
-};
-const GRAD: Record<string, string> = {
-  map: 'linear-gradient(160deg,#58d083,#2f9e5a)', notes: 'linear-gradient(160deg,#ffd75a,#e8b62c)', photos: 'linear-gradient(160deg,#ffffff,#e9eaee)',
-  messages: 'linear-gradient(160deg,#6ef08a,#2fbf4f)', memos: 'linear-gradient(160deg,#ff6a5c,#d93a2e)', bag: 'linear-gradient(160deg,#b98a5a,#7a5230)',
-  endings: 'linear-gradient(160deg,#3a2a4a,#150d1e)', settings: 'linear-gradient(160deg,#9aa0a8,#5c636c)', phone: 'linear-gradient(160deg,#6ef08a,#2fbf4f)',
-  camera: 'linear-gradient(160deg,#cfd3d9,#8f959e)',
-};
+// Les icônes sont des objets du village modélisés et rendus dans Blender (tools/blender/icons.py → public/ui/)
+const UI = `${import.meta.env.BASE_URL}ui/`;
 const APPS: [Screen, string, string][] = [
   ['map', 'Maps', 'map'], ['notes', 'Notes', 'notes'], ['photos', 'Photos', 'photos'], ['memos', 'Voice Memos', 'memos'],
   ['bag', 'Bag', 'bag'], ['endings', 'Azé-tin', 'endings'], ['settings', 'Settings', 'settings'],
@@ -183,8 +166,8 @@ export class Phone {
   }
 
   /** Une notification, comme sur un vrai téléphone (SMS, photo enregistrée, mémo vocal…) */
-  notify(app: keyof typeof ICON, title: string, text: string, seconds = 5): void {
-    this.banner.innerHTML = `<i style="background:${GRAD[app]}"><svg viewBox="0 0 24 24">${ICON[app]}</svg></i><div><b>${title}</b><span>${text}</span></div><em>now</em>`;
+  notify(app: string, title: string, text: string, seconds = 5): void {
+    this.banner.innerHTML = `<i><img src="${UI}icon-${app}.png" alt=""></i><div><b>${title}</b><span>${text}</span></div><em>now</em>`;
     this.banner.classList.add('on');
     this.bannerTimer = seconds;
   }
@@ -289,7 +272,7 @@ export class Phone {
     this.screen = screen;
     this.root.classList.toggle('in-app', screen !== 'home' && screen !== 'pause');
     let html = '';
-    const icon = (id: string) => `<i class="ph-ico" style="background:${GRAD[id]}"><svg viewBox="0 0 24 24">${ICON[id]}</svg></i>`;
+    const icon = (id: string) => `<i class="ph-ico"><img src="${UI}icon-${id}.png" alt=""></i>`;
     switch (screen) {
       case 'home': {
         const step = currentStep().step;
@@ -334,12 +317,12 @@ export class Phone {
       case 'messages':
         html = `${this.nav('Messages', 'home', 'Edit')}<div class="ph-threads">
           ${hasFlag('msgH') ? `<button class="ph-thr" data-thread="h"><i class="ph-av dark">?</i><div><b>Unknown</b><span>Welcome to Azé-tin… Stay for dinner. — H.</span></div><em>${clockText()}</em></button>` : ''}
-          <button class="ph-thr" data-thread="mum"><i class="ph-av">M</i><div><b>Mum ❤️</b><span>Call me when you reach your father's village.</span></div><em>18:42</em></button></div>`;
+          <button class="ph-thr" data-thread="mum"><i class="ph-av">M</i><div><b>Mum</b><span>Call me when you reach your father's village.</span></div><em>18:42</em></button></div>`;
         break;
       case 'thread':
         html = this.sel === 'h'
           ? `${this.nav('Unknown', 'messages', 'Messages')}<div class="ph-thread"><div class="msg in">Welcome to Azé-tin… Stay for dinner. — H.</div>${hasFlag('act2') ? '<div class="msg in">Midnight. Now everyone is awake.</div>' : ''}</div>`
-          : `${this.nav('Mum ❤️', 'messages', 'Messages')}<div class="ph-thread">
+          : `${this.nav('Mum', 'messages', 'Messages')}<div class="ph-thread">
             <div class="msg in">Call me when you reach your father's village. Be careful on those roads.</div>
             <div class="msg out">Almost there mum! GPS is dead lol</div>
             <div class="msg out fail">The car broke down. Some village called Azé-tin. Don't worry.<em>Not Delivered</em></div>
@@ -348,14 +331,14 @@ export class Phone {
         break;
       case 'phone':
         html = `${this.nav('Recents')}<div class="ph-threads">
-          <div class="ph-thr"><i class="ph-av">M</i><div><b class="red">Mum ❤️ (3)</b><span>Missed · mobile</span></div><em>18:51</em></div>
-          <div class="ph-thr"><i class="ph-av">M</i><div><b>Mum ❤️</b><span>Outgoing · No service</span></div><em>19:02</em></div></div>
+          <div class="ph-thr"><i class="ph-av">M</i><div><b class="red">Mum (3)</b><span>Missed · mobile</span></div><em>18:51</em></div>
+          <div class="ph-thr"><i class="ph-av">M</i><div><b>Mum</b><span>Outgoing · No service</span></div><em>19:02</em></div></div>
           <p class="ph-empty">Call failed. No service.</p>`;
         break;
       case 'memos': {
         const memos = [['owl', 'Owl — high, shrill', 'firstOwl'], ['hornbill', 'Hornbill — low, two notes', 'hornbillHint']].filter(([, , f]) => hasFlag(f));
         html = `${this.nav('All Recordings')}<div class="ph-threads">${memos.length ? memos.map(([s, name], i) =>
-          `<button class="ph-thr ph-memo" data-sound="${s}"><div><b>${name}</b><span>Recording ${i + 1} · 0:0${3 + i}</span></div><i class="ph-play">▶</i></button>`).join('')
+          `<button class="ph-thr ph-memo" data-sound="${s}"><div><b>${name}</b><span>Recording ${i + 1} · 0:0${3 + i}</span></div><i class="ph-play"></i></button>`).join('')
           : '<p class="ph-empty">Bird calls you hear are saved here, so you can learn them.</p>'}</div>
           ${memos.length ? '<p class="ph-empty">The hornbill guides. The owl hunts. Learn the difference.</p>' : ''}`;
         break;

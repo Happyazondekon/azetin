@@ -46,7 +46,7 @@ export class Hud {
     this.marker.classList.toggle('edge', edge);
     this.marker.style.left = `${x}px`;
     this.marker.style.top = `${y}px`;
-    this.marker.innerHTML = `<i></i>${label}`;
+    this.marker.innerHTML = `<img src="${import.meta.env.BASE_URL}ui/icon-ember.png" alt="">${label}`;
   }
 
   // Nom du lieu quand Happy y arrive
@@ -59,7 +59,7 @@ export class Hud {
   // Charges de kaolin (seulement quand Happy a la calebasse)
   setKaolin(n: number | null): void {
     this.kaolin.style.opacity = n === null ? '0' : '1';
-    if (n !== null) this.kaolin.innerHTML = `<span>Kaolin</span>${'●'.repeat(n)}${'○'.repeat(5 - n)}<small>Q</small>`;
+    if (n !== null) this.kaolin.innerHTML = `<span>Kaolin</span>${Array.from({ length: 5 }, (_, i) => `<img class="${i < n ? '' : 'off'}" src="${import.meta.env.BASE_URL}ui/icon-kaolin.png" alt="">`).join('')}<small>Q</small>`;
   }
 
   setGrabbed(on: boolean): void {
