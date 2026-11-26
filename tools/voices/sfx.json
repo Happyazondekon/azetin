@@ -133,5 +133,18 @@
  "hornbill_far": {
   "text": "Ground hornbill deep booming two-note call, distant, echoing over a lagoon at night",
   "seconds": 3
+ },
+ "rite_drums": {
+  "text": "Deep ritual talking drums and slow rattles, hypnotic, West African ceremony at night, loopable",
+  "seconds": 20,
+  "loop": true
+ },
+ "judged": {
+  "text": "Supernatural roaring wind rising into a choir, then a deep rumble as something is dragged underground",
+  "seconds": 6
+ },
+ "souls": {
+  "text": "Soft ethereal rising chime and gentle wind, souls released into light, peaceful",
+  "seconds": 8
  }
 }

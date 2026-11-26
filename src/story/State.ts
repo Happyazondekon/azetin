@@ -81,3 +81,10 @@ export function loadGame(): boolean {
     return false;
   }
 }
+
+// Après une fin : la partie est terminée, on repart de zéro (les fins vues restent)
+export function clearSave(): void {
+  try {
+    localStorage.removeItem(KEY);
+  } catch { /* rien */ }
+}

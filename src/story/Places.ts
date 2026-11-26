@@ -78,7 +78,7 @@ export const STEPS: Step[] = [
   { id: 'midnight', text: 'Midnight is coming…', hint: 'Someone in this village wants to meet you.', target: () => null, done: () => hasFlag('act2') },
   // ---- Acte III (prototype : la réparation, puis le choix)
   { id: 'repair', text: 'Bring the battery to Kossi', hint: 'Back to the workshop, west of the square.', target: at('atelier'), done: () => hasFlag('repaired') },
-  { id: 'leave', text: 'Drive away before dawn — or stay and learn the truth', hint: 'Your 4×4 is at the end of the road, south.', target: at('car'), done: () => false },
+  { id: 'leave', text: 'Before dawn, choose: drive away · burn the healer’s house for Houngbo · or the rite', hint: 'The rite needs the 3 plants and the whole truth (5 fragments), at the asen under the station ruins.', target: () => (story.plantes >= 3 && story.secret >= 5 ? { x: 38.6, z: -5 } : hasFlag('repaired') ? { x: 1.2, z: 68 } : { x: -16, z: 5 }), done: () => false },
 ];
 
 export function currentStep(): { step: Step; index: number } {

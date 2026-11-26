@@ -64,7 +64,7 @@ export class Audio {
     this.preload(['sfx/owl.mp3', 'sfx/hornbill.mp3', 'sfx/stinger1.mp3', 'sfx/stinger2.mp3', 'sfx/stinger3.mp3', 'sfx/heartbeat.mp3',
       'sfx/night.mp3', 'sfx/drone.mp3', 'sfx/fire.mp3', 'sfx/whispers.mp3', 'sfx/ember.mp3', 'sfx/swing.mp3', 'sfx/impact.mp3',
       'sfx/tire_burst.mp3', 'sfx/owl_impact.mp3', 'sfx/car_drive.mp3', 'sfx/radio.mp3', 'sfx/phone_buzz.mp3', 'sfx/generator.mp3',
-      'sfx/laugh.mp3', 'sfx/breath.mp3', 'sfx/footsteps.mp3', 'sfx/ui_click.mp3', 'sfx/ui_hover.mp3', 'sfx/ui_back.mp3', 'sfx/gong.mp3', 'sfx/kaolin.mp3', 'sfx/shutter.mp3', 'sfx/explosion.mp3', 'sfx/festival.mp3', 'sfx/tape.mp3', 'sfx/hornbill_far.mp3', 'music/theme.mp3', 'music/tension.mp3']);
+      'sfx/laugh.mp3', 'sfx/breath.mp3', 'sfx/footsteps.mp3', 'sfx/ui_click.mp3', 'sfx/ui_hover.mp3', 'sfx/ui_back.mp3', 'sfx/gong.mp3', 'sfx/kaolin.mp3', 'sfx/shutter.mp3', 'sfx/explosion.mp3', 'sfx/festival.mp3', 'sfx/tape.mp3', 'sfx/hornbill_far.mp3', 'sfx/rite_drums.mp3', 'sfx/judged.mp3', 'sfx/souls.mp3', 'music/rite.mp3', 'music/dawn.mp3', 'music/theme.mp3', 'music/tension.mp3']);
   }
 
   /** Son d'interface (clic, survol, retour) : un coup sec et un souffle — l'horreur jusque dans les menus */

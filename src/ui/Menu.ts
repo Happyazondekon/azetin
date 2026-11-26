@@ -1,3 +1,5 @@
+import { ENDINGS, endingsSeen } from './Endings';
+
 // Menu principal : entrées gravées comme les noms de la stèle, braise orange au survol.
 // Le décor 3D derrière (4×4 en panne devant le panneau) est rendu par Game.
 export interface MenuActions {
@@ -5,13 +7,13 @@ export interface MenuActions {
   onContinue(): void;
 }
 
+const endingsPanel = () => {
+  const seen = endingsSeen();
+  return `<h3>Endings</h3><ul class="endings">${ENDINGS.map((e) => seen.includes(e.id) ? `<li>${e.num} · ${e.title}</li>` : `<li class="locked">${e.num} · ???<small>${e.hint}</small></li>`).join('')}</ul>
+    <p class="hint">${seen.length}/4</p>`;
+};
+
 const PANELS: Record<string, string> = {
-  endings: `<h3>Endings</h3>
-    <ul class="endings">
-      <li class="locked">I · ??? </li><li class="locked">II · ???</li>
-      <li class="locked">III · ???</li><li class="locked">IV · ???</li>
-    </ul>
-    <p class="hint">The hornbill only cries for those who listen.</p>`,
   settings: `<h3>Settings</h3><p>Open your phone (Tab) during the game to change settings.</p>`,
   credits: `<h3>Credits</h3><p>A game by <b>Happy Azondekon</b> · HeyHappy Studio</p>
     <p>Made for OpenGame Game Jam #1 · Voices, sound and music: ElevenLabs</p>
@@ -81,7 +83,7 @@ export class Menu {
   }
 
   private showPanel(name: string): void {
-    const html = PANELS[name] ?? '';
+    const html = name === 'endings' ? endingsPanel() : PANELS[name] ?? '';
     const same = this.panel.dataset.name === name && this.panel.classList.contains('on');
     this.panel.innerHTML = html;
     this.panel.dataset.name = name;

@@ -18,10 +18,11 @@ import { Director } from '../story/Director';
 import { buildAct2Props, type Pickup } from '../world/Act2Props';
 import type { FireHandle } from '../world/Fire';
 import { instance, type ModelName, type Models } from '../world/Assets';
+import { markEnding } from '../ui/Endings';
 import { LAYER_SEEN, LAYER_TRUTH } from '../world/Village';
 import LINES from '../story/lines.json';
 import { buildPerson, type Person } from '../world/People';
-import { story, resetStory, loadGame, saveGame, hasSave, hasFlag, setFlag } from '../story/State';
+import { story, resetStory, loadGame, saveGame, hasSave, hasFlag, setFlag, clearSave } from '../story/State';
 
 type Mode = 'menu' | 'playing' | 'paused' | 'dead' | 'cine';
 type LineId = Exclude<keyof typeof LINES, '_voices'>;
@@ -159,6 +160,7 @@ export class Game {
       onResume: () => this.resume(),
       onQuit: () => this.quitToTitle(),
       onClose: () => this.togglePhone(),
+      onPlay: (snd) => this.audio.sfx(snd, { gain: 0.9 }),
       onSensitivity: (v) => (this.player.sensitivity = v),
       onVolume: (v) => this.audio.setVolume(v),
       onBrightness: (v) => (this.renderer.toneMappingExposure = this.exposure = v),
@@ -273,6 +275,7 @@ export class Game {
 
   private die(cause: DeathCause): void {
     this.mode = 'dead';
+    this.resetRite();
     this.grab = null;
     this.hud.setGrabbed(false);
     this.hud.hideAll();
@@ -596,6 +599,22 @@ export class Game {
         label: () => (hasFlag('calabash') && story.kaolin < 5 ? 'Fill the calabash with kaolin at the asen' : null),
         use: () => { story.kaolin = 5; this.audio.sfx('kaolin', { gain: 0.5 }); this.hud.say('The calabash is full of white earth again. (5/5)', 3); this.save(); },
       },
+      // ---- Acte III : le marché de Houngbo, et le rite à l'asen enfoui sous la station
+      {
+        pos: new THREE.Vector3(-6, 0, -30.4), range: 2.4,
+        label: () => (hasFlag('act2') && !hasFlag('ended') && !this.rite ? 'Burn the healer’s house (Houngbo’s deal)' : null),
+        use: () => this.burnHouse(),
+      },
+      {
+        pos: new THREE.Vector3(38.6, 0, -5.0), range: 2.6,
+        label: () => (!hasFlag('act2') || hasFlag('ended') ? null
+          : this.rite ? (this.rite.phase < 3 && this.rite.refillCd <= 0 && story.kaolin < 5 ? 'Take kaolin from the asen' : null)
+            : 'Begin the rite at the asen'),
+        use: () => {
+          if (this.rite) { story.kaolin = 5; this.rite.refillCd = 12; this.audio.sfx('kaolin', { gain: 0.5 }); return; }
+          this.startRite();
+        },
+      },
       ...this.pickups.map((pk): Interactable => ({
         pos: pk.pos.clone().setY(0), range: pk.kind === 'plant' && pk.id === 'flower' ? 3.2 : 2.2,
         label: () => (pk.obj.visible && hasFlag('act1') ? (pk.kind === 'fragment' ? `Photograph: ${pk.name}` : pk.kind === 'plant' ? `Pick the ${pk.name.toLowerCase()}` : `Take ${pk.name}`) : null),
@@ -772,7 +791,7 @@ export class Game {
     if (hasFlag('msgH')) return;
     setFlag('msgH');
     this.audio.sfx('phone_buzz');
-    this.hud.say('📱 Unknown number — “Welcome to Azé-tin… Stay for dinner. — H.”', 7);
+    this.phone.notify('messages', 'Unknown', 'Welcome to Azé-tin… Stay for dinner. — H.', 7);
   }
 
   // La silhouette au bord de la route : elle regarde le 4×4, puis disparaît quand la torche clignote
@@ -792,6 +811,7 @@ export class Game {
     const w = this.world;
     if (this.fb) { this.updateFlashback(dt); return; }
     this.act2Beats(dt);
+    this.act3Beats(dt);
     // 1) La silhouette sur la route
     const fig = this.figure;
     if (fig) {
@@ -1029,7 +1049,7 @@ export class Game {
       // piège : le hibou du chef garde sa case
       setTimeout(() => { if (this.mode === 'playing' && !this.fb) { this.audio.sfx('owl', { gain: 1.3 }); this.owlQte = { t: 3.5, ok: false }; } }, 2500);
     }
-    this.hud.objective(`Fragment of the secret ${story.secret}/5 — saved in your Gallery.`);
+    this.phone.notify('photos', 'Photos', `Saved to “The secret” · ${story.secret} of 5`, 4);
     this.save();
     if (story.secret === 3 && !hasFlag('flashback')) setTimeout(() => this.startFlashback(), pk.id === 'tape' ? 14000 : 6500);
   }
@@ -1545,6 +1565,487 @@ export class Game {
     });
   }
 
+  // ================================================================ ACTE III — LA NUIT DES AZÉVI
+  private act3Ready = false;
+  private nextRise = 0;
+  private hutGlow: THREE.PointLight[] = [];
+  private rite: {
+    phase: 0 | 1 | 2 | 3; t: number; spawned: number; repelled: number; hits: number; hCd: number; hWind: number; hVisible: number;
+    verse: number; seq: string[]; idx: number; keyT: number; strikeT: number; strikeWarn: number; refillCd: number; ui: HTMLDivElement; plants: THREE.Object3D[]; pillar: THREE.Mesh | null;
+  } | null = null;
+  private houngboSeen: THREE.Object3D[] = [];
+
+  private setupAct3(): void {
+    if (this.act3Ready) return;
+    this.act3Ready = true;
+    // les cases s'allument d'une lueur orange : le village est réveillé
+    for (const [x, z] of [[-8, -7], [14, -11], [-23, -6], [20, 14], [-12, 18], [7, 21], [24, -23], [-27, -22], [12, -33], [-19, -38], [28, 4], [31, 22], [-33, 6]]) {
+      const l = new THREE.PointLight(0xff6a20, 5, 7, 1.6);
+      l.position.set(x, 1.2, z + 1.6);
+      this.scene.add(l);
+      this.hutGlow.push(l);
+    }
+    // l'asen enfoui sous les ruines de la station, dégagé par l'explosion de minuit
+    const a = instance(this.models, 'az-asen', 1.15);
+    if (a) { a.position.set(38.6, 0.12, -6.6); this.scene.add(a); }
+    // Houngbo : ses parties « vues » (pour la phase de fumée, on ne le voit plus que dans le rétroviseur)
+    this.houngboSeen = [];
+    this.houngbo?.root.traverse((o) => { if (o.layers.isEnabled(LAYER_SEEN) && !o.layers.isEnabled(LAYER_TRUTH) && (o as THREE.Mesh).isMesh) this.houngboSeen.push(o); });
+    this.nextRise = this.time + 25;
+  }
+
+  private act3Beats(dt: number): void {
+    if (!hasFlag('act2') || hasFlag('ended')) return;
+    this.setupAct3();
+    for (const l of this.hutGlow) l.intensity = 4 + Math.sin(this.time * 6 + l.position.x) * 1.2 + Math.random() * 0.6;
+    if (this.rite) { this.updateRite(dt); return; }
+    // l'horloge avance vers l'aube (sauf pendant le rite)
+    const before = story.minutes;
+    story.minutes += dt * 0.5;
+    if (before < 28 * 60 + 30 && story.minutes >= 28 * 60 + 30) this.hud.objective('4:30 — Dawn is coming. Half an hour left.');
+    if (story.minutes >= 29 * 60 && this.mode === 'playing') { this.line('happy_dawn', 4); this.ending(true); return; }
+    // les Brûlés se lèvent un à un et viennent chercher Happy
+    const nearCar = this.player.pos.distanceTo(this.world.points.car) < 6;
+    if (this.time > this.nextRise && !nearCar && this.enemies.near(this.player.pos, 30) < 3) {
+      this.nextRise = this.time + 28 + Math.random() * 20;
+      const cand = Object.entries(this.world.people).filter(([id, p]) => p.def.azevi && id !== 'dossi' && p.root.visible
+        && p.root.position.distanceTo(this.player.pos) > 9 && p.root.position.distanceTo(this.player.pos) < 26);
+      if (cand.length) {
+        const [id, p] = cand[Math.floor(Math.random() * cand.length)];
+        delete this.world.people[id];
+        this.enemies.adopt(p);
+        this.audio.sfx('breath', { gain: 0.8, pan: this.panOf(p.root.position) });
+        if (!hasFlag('firstRise')) { setFlag('firstRise'); this.hud.say('[One of the villagers stands up. Slowly. And turns towards you.]', 5); }
+      }
+    }
+  }
+
+  private riteMissing(): string | null {
+    const miss: string[] = [];
+    if (story.plantes < 3) miss.push(`the healer’s plants (${story.plantes}/3)`);
+    if (story.secret < 5) miss.push(`the whole truth (fragments ${story.secret}/5)`);
+    if (!hasFlag('calabash')) miss.push('Dah Agossou’s calabash');
+    return miss.length ? `The asen stays silent. Still missing: ${miss.join(', ')}.` : null;
+  }
+
+  // ---------------------------------------------------------------- choix III : brûler la maison du guérisseur
+  private burnHouse(): void {
+    this.ask('Set the healer’s house on fire', () => this.burnScene(), 'Step away', () => this.hud.say('Not like this.', 2));
+  }
+
+  private burnScene(): void {
+    setFlag('ended');
+    this.mode = 'cine';
+    this.hud.setPrompt(null);
+    const w = this.world;
+    const h = this.houngbo;
+    const eye = new THREE.Vector3(-6, 1.6, -24.5);
+    const fires: FireHandle[] = [];
+    const fired = new Set<string>();
+    const at = (k: string, t: number, now: number, f: () => void) => { if (now >= t && !fired.has(k)) { fired.add(k); f(); } };
+    let stele: THREE.Mesh | null = null;
+    this.line('happy_burn', 4);
+    this.director.play({
+      duration: 26,
+      update: (t, dt) => {
+        h?.update(dt);
+        if (t < 15) { this.camera.position.copy(eye); this.camera.lookAt(-6, 1.6 + Math.min(1, t / 8) * 1.5, -34); }
+        at('fire1', 2.5, t, () => { for (const [x, z, s] of [[-6, -31.8, 1.2], [-8, -33, 2.2], [-4, -34, 2.6], [-6, -35.5, 3.2]] as [number, number, number][]) fires.push(w.fx.add(new THREE.Vector3(x, 0.2, z), s, { smoke: true })); this.audio.loop('fire', 0.9); });
+        at('chief', 6, t, () => {
+          if (h) { h.root.position.set(-2.4, 0, -27.5); h.root.rotation.y = Math.atan2(-6 + 2.4, -24.5 + 27.5); h.root.visible = true; h.play('Idle_Talking_Loop'); for (const o of this.houngboSeen) o.visible = true; }
+          this.line('houngbo_thanks', 7);
+          this.audio.sfx('laugh', { gain: 1 });
+        });
+        // la station saute une seconde fois : écran blanc
+        at('boom', 13, t, () => { w.fx.explode(new THREE.Vector3(38, 1, -5), 2); this.audio.sfx('explosion', { gain: 1.5 }); this.whiteOut(true); });
+        // le matin : un nom de plus sur la stèle
+        at('morning', 16, t, () => {
+          this.audio.loop('fire', 0);
+          for (const f of fires) w.fx.remove(f);
+          if (h) h.root.visible = false;
+          story.minutes = 30 * 60 + 30;
+          stele = this.steleName('HAPPY');
+          this.whiteOut(false);
+        });
+        if (t >= 16) { this.camera.position.set(-3.2, 1.35, 34.6 - Math.min(1, (t - 16) / 8) * 1.2); this.camera.lookAt(-3.2, 1.05, 32); }
+        at('owl', 22, t, () => this.audio.sfx('owl', { gain: 0.5 }));
+      },
+      end: () => {
+        if (stele === null) this.steleName('HAPPY');
+        markEnding('ashes');
+        this.finalScreen('Ending III — The Ashes', ['Houngbo laughs: “Thank you, traveller.” A second explosion. White.', 'In the morning, the stone at the entrance carries one more name: HAPPY.', 'Azé-tin keeps its secret. And its chief.']);
+      },
+    });
+  }
+
+  private whiteOut(on: boolean): void {
+    let el = document.querySelector<HTMLDivElement>('.whiteout');
+    if (!el) { el = document.createElement('div'); el.className = 'whiteout'; document.body.appendChild(el); }
+    el.classList.toggle('on', on);
+  }
+
+  // Un nom gravé de frais sur la stèle des morts
+  private steleName(name: string): THREE.Mesh {
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 64;
+    const g = c.getContext('2d')!;
+    g.font = 'bold 40px serif';
+    g.textAlign = 'center';
+    g.fillStyle = 'rgba(20,14,10,0.92)';
+    g.fillText(name, 128, 46);
+    g.fillStyle = 'rgba(255,240,220,0.25)';
+    g.fillText(name, 129, 47);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.19), new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(c), transparent: true, roughness: 1 }));
+    m.position.set(-3.2, 0.62, 32.17);
+    m.layers.enableAll();
+    this.scene.add(m);
+    return m;
+  }
+
+  private finalScreen(title: string, lines: string[]): void {
+    setFlag('ended');
+    clearSave();
+    this.mode = 'dead';
+    this.hud.hideAll();
+    this.hud.setKaolin(null);
+    document.exitPointerLock();
+    this.gameOver.showEnding(title, lines);
+  }
+
+  // ---------------------------------------------------------------- choix IV : le rite
+  private startRite(): void {
+    const miss = this.riteMissing();
+    if (miss) { this.hud.say(miss, 6); return; }
+    if (story.marque > 1) { this.hud.say('In the water of the asen, your reflection is covered in ash. The ancestors will not hear you.', 6); return; }
+    this.save();
+    const ui = document.createElement('div');
+    ui.className = 'chant';
+    document.body.appendChild(ui);
+    this.rite = { phase: 1, t: 0, spawned: 0, repelled: 0, hits: 0, hCd: 2, hWind: 0, hVisible: 0, verse: 0, seq: [], idx: 0, keyT: 0, strikeT: 7, strikeWarn: 0, refillCd: 0, ui, plants: [], pillar: null };
+    for (const e of this.enemies.list) e.state = 'flee';
+    this.audio.loop('rite_drums', 0.7);
+    this.audio.loop('rite', 0.5, 'music/rite.mp3');
+    this.audio.loop('drone', 0);
+    this.line('agossou_rite', 9);
+    setTimeout(() => { this.line('houngbo_rite1', 6); this.audio.sfx('laugh', { gain: 0.9 }); }, 9500);
+    this.hud.setTracker('THE RITE — I', 'Hold them back with kaolin (Q). Refill at the asen (E).', '');
+  }
+
+  private updateRite(dt: number): void {
+    const r = this.rite!;
+    r.t += dt;
+    r.refillCd = Math.max(0, r.refillCd - dt);
+    const asen = new THREE.Vector3(38.6, 0, -6.6);
+    const pos = this.player.pos;
+    const h = this.houngbo;
+    if (r.phase === 1) {
+      // vagues de Brûlés autour de l'asen
+      if (r.t > 10 && r.spawned < 8 && r.t > 10 + r.spawned * 5) {
+        const a = Math.random() * Math.PI * 2;
+        this.enemies.spawn(asen.clone().add(new THREE.Vector3(Math.cos(a) * 14, 0, Math.sin(a) * 14)), false, 'chase');
+        r.spawned++;
+      }
+      this.hud.setTracker('THE RITE — I', `Hold them back with kaolin (Q) · ${Math.min(r.repelled, 6)}/6 — refill at the asen (E)`, '');
+      if (r.repelled >= 6 || r.t > 70) {
+        r.phase = 2; r.t = 0; r.hits = 0;
+        this.enemies.scatter();
+        this.line('houngbo_rite2', 6);
+        if (h) {
+          h.root.position.copy(asen).add(new THREE.Vector3(10, 0, 6));
+          h.root.visible = true;
+          for (const o of this.houngboSeen) o.visible = false; // il n'existe plus que dans le reflet
+          h.play('Walk_Loop');
+        }
+      }
+    } else if (r.phase === 2) {
+      // la fumée : on ne le voit que dans le rétroviseur ; on le frappe quand il est tout près
+      this.world.sky.smoke = Math.min(1, this.world.sky.smoke + dt * 0.4);
+      this.hud.setTracker('THE RITE — II', `He is in the smoke. Raise the mirror (right click) to see him. Strike him · ${r.hits}/3`, '');
+      if (h) {
+        h.update(dt);
+        r.hVisible = Math.max(0, r.hVisible - dt);
+        for (const o of this.houngboSeen) o.visible = r.hVisible > 0;
+        r.hCd = Math.max(0, r.hCd - dt);
+        const d = pos.clone().sub(h.root.position).setY(0);
+        const dist = d.length();
+        h.root.rotation.y = Math.atan2(d.x, d.z);
+        if (r.hWind > 0) {
+          r.hWind -= dt;
+          if (r.hWind <= 0) {
+            if (dist < 2.2) { this.hurt(13, 'chief'); this.audio.thud(); this.shake = 0.4; }
+            r.hCd = 2.5;
+            h.play('Walk_Loop', 0.2);
+          }
+        } else if (dist > 1.5) {
+          h.root.position.addScaledVector(d.normalize(), Math.min(dist - 1.4, 2.3 * dt));
+        } else if (r.hCd <= 0) {
+          r.hWind = 0.9;
+          h.play('Interact', 0.1, true);
+          this.audio.sfx('breath', { gain: 1, pan: this.panOf(h.root.position) });
+        }
+        if (Math.random() < dt * 3) this.world.fx.emitSmoke(h.root.position.clone().setY(1.2), 1.6, 0.4, 3, 0x1a1612);
+      }
+    } else if (r.phase === 3) {
+      this.updateChant(dt);
+    }
+  }
+
+  // Un coup de l'arme pendant la phase de fumée
+  private riteStrike(dir: THREE.Vector3, range: number): boolean {
+    const r = this.rite, h = this.houngbo;
+    if (!r || r.phase !== 2 || !h) return false;
+    const d = h.root.position.clone().sub(this.player.pos).setY(0);
+    if (d.length() > range + 0.6 || d.normalize().dot(dir) < 0.45) return false;
+    r.hits++;
+    this.sparks.burst(h.root.position.clone().setY(1.4), 50);
+    this.audio.thud();
+    this.audio.voiceMix('argh', 'm', { ghost: true, gain: 1, rate: 0.6 });
+    r.hVisible = 0.6;
+    const a = Math.random() * Math.PI * 2;
+    h.root.position.copy(this.player.pos).add(new THREE.Vector3(Math.cos(a) * 11, 0, Math.sin(a) * 11));
+    r.hCd = 2;
+    if (r.hits >= 3) this.beginChant();
+    return true;
+  }
+
+  // Le kaolin pendant le rite
+  private riteKaolin(dir: THREE.Vector3, repelled: number): void {
+    const r = this.rite, h = this.houngbo;
+    if (!r) return;
+    r.repelled += repelled;
+    if (r.phase === 2 && h) {
+      const d = h.root.position.clone().sub(this.player.pos).setY(0);
+      if (d.length() < 6.5 && d.normalize().dot(dir) > 0.3) { r.hVisible = 2.5; r.hCd = 3; r.hWind = 0; this.audio.voiceMix('aaah', 'm', { ghost: true, gain: 0.9, rate: 0.6 }); }
+    }
+    if (r.phase === 3 && r.strikeWarn > 0) {
+      r.strikeWarn = 0;
+      r.strikeT = 6 + Math.random() * 3;
+      this.hud.say('The white earth burns his hand. He steps back.', 2.5);
+    }
+  }
+
+  // Mort pendant le rite : tout s'arrête, on recommence à l'asen
+  private resetRite(): void {
+    const r = this.rite;
+    if (!r) return;
+    r.ui.remove();
+    if (r.pillar) this.scene.remove(r.pillar);
+    for (const o of r.plants) this.scene.remove(o);
+    this.rite = null;
+    this.world.sky.smoke = 0;
+    if (this.houngbo) this.houngbo.root.visible = false;
+    for (const o of this.houngboSeen) o.visible = true;
+    this.audio.loop('rite_drums', 0);
+    this.audio.loop('rite', 0, 'music/rite.mp3');
+    this.hud.setTracker(null);
+  }
+
+  private beginChant(): void {
+    const r = this.rite!;
+    r.phase = 3;
+    r.t = 0;
+    r.verse = 0;
+    this.world.sky.smoke = 0.35;
+    const h = this.houngbo;
+    if (h) { h.root.position.set(38.6 + 5, 0, -6.6 + 3); for (const o of this.houngboSeen) o.visible = true; h.play('Idle_Talking_Loop'); }
+    this.player.place(38.6, -4.4, 0);
+    this.line('houngbo_rite3', 5);
+    // une colonne de lumière blanche monte de l'asen, plus haute à chaque strophe
+    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.9, 1, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0xfff6e0, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false }));
+    pillar.position.set(38.6, 0.5, -6.6);
+    pillar.scale.y = 0.01;
+    pillar.layers.enableAll();
+    this.scene.add(pillar);
+    r.pillar = pillar;
+    story.kaolin = Math.max(story.kaolin, 3);
+    setTimeout(() => this.newVerse(), 4500);
+  }
+
+  private newVerse(): void {
+    const r = this.rite;
+    if (!r) return;
+    const keys = ['up', 'down', 'left', 'right'];
+    r.seq = Array.from({ length: 6 + r.verse }, () => keys[Math.floor(Math.random() * 4)]);
+    r.idx = 0;
+    r.keyT = 2.2;
+    r.strikeT = 5 + Math.random() * 3;
+    r.strikeWarn = 0;
+    this.drawChant();
+  }
+
+  private drawChant(): void {
+    const r = this.rite!;
+    const glyph: Record<string, string> = { up: '↑', down: '↓', left: '←', right: '→' };
+    const names = ['Moon liana', 'Ash grass', 'Hornbill flower'];
+    r.ui.innerHTML = `<small>Verse ${r.verse + 1}/3 — ${names[r.verse]}</small><div>${r.seq.map((k, i) => `<b class="${i < r.idx ? 'ok' : i === r.idx ? 'now' : ''}">${glyph[k]}</b>`).join('')}</div>
+      <em>Arrows or ZQSD / WASD · Q = kaolin when he strikes</em>${r.strikeWarn > 0 ? '<strong>HOUNGBO STRIKES — THROW KAOLIN (Q)!</strong>' : ''}`;
+    r.ui.classList.add('on');
+  }
+
+  private updateChant(dt: number): void {
+    const r = this.rite!;
+    if (!r.seq.length) return;
+    this.houngbo?.update(dt);
+    // les coups de Houngbo : il faut le repousser au kaolin
+    if (r.strikeWarn > 0) {
+      r.strikeWarn -= dt;
+      if (r.strikeWarn <= 0) { this.hurt(14, 'chant'); this.audio.thud(); this.shake = 0.5; this.failVerse('His hand strikes your chest. The verse breaks.'); return; }
+    } else {
+      r.strikeT -= dt;
+      if (r.strikeT <= 0) { r.strikeWarn = 1.7; this.houngbo?.play('Interact', 0.1, true); this.audio.sfx('stinger2', { gain: 0.5 }); this.drawChant(); }
+    }
+    // les touches du chant
+    const map: Record<string, string> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right' };
+    r.keyT -= dt;
+    let pressed: string | null = null;
+    for (const [code, k] of Object.entries(map)) if (this.input.wasPressed(code)) pressed = k;
+    if (pressed) {
+      if (pressed === r.seq[r.idx]) {
+        r.idx++;
+        r.keyT = 2.2;
+        this.audio.ui('click');
+        if (r.idx >= r.seq.length) return this.verseDone();
+      } else return this.failVerse('A wrong word. The ancestors stop listening… start the verse again.');
+      this.drawChant();
+    } else if (r.keyT <= 0) return this.failVerse('Too slow. The ancestors listen slowly — but they do listen.');
+  }
+
+  private failVerse(msg: string): void {
+    const r = this.rite!;
+    this.hud.say(msg, 3);
+    story.souffle -= 6;
+    r.seq = [];
+    r.ui.classList.remove('on');
+    if (this.mode === 'playing') setTimeout(() => this.newVerse(), 1800);
+  }
+
+  private verseDone(): void {
+    const r = this.rite!;
+    const lines = ['chant_1', 'chant_2', 'chant_3'] as const;
+    this.line(lines[r.verse], 6);
+    // la plante déposée sur l'asen s'illumine
+    const p = this.pickups.find((x) => x.id === ['liana', 'ash', 'flower'][r.verse]);
+    if (p) {
+      const o = p.obj.clone();
+      const a = r.verse * 2.1;
+      o.position.set(38.6 + Math.cos(a) * 0.5, 0.45, -6.6 + Math.sin(a) * 0.5);
+      o.visible = true;
+      this.scene.add(o);
+      r.plants.push(o);
+    }
+    this.audio.sfx('souls', { gain: 0.6 });
+    story.kaolin = Math.min(5, story.kaolin + 2);
+    r.verse++;
+    if (r.pillar) r.pillar.scale.y = r.verse * 7;
+    if (r.pillar) r.pillar.position.y = r.pillar.scale.y / 2;
+    r.seq = [];
+    r.ui.classList.remove('on');
+    if (r.verse >= 3) setTimeout(() => this.healerEnding(), 3500);
+    else setTimeout(() => this.newVerse(), 5500);
+  }
+
+  // ---------------------------------------------------------------- Fin IV : le dernier guérisseur
+  private healerEnding(): void {
+    const r = this.rite;
+    setFlag('ended');
+    this.mode = 'cine';
+    r?.ui.remove();
+    this.world.sky.smoke = 0;
+    this.hud.setTracker(null);
+    this.hud.setKaolin(null);
+    this.audio.loop('rite_drums', 0);
+    this.audio.loop('rite', 0, 'music/rite.mp3');
+    for (const e of this.enemies.list) e.person.root.visible = false;
+    const w = this.world;
+    const h = this.houngbo;
+    const souls: THREE.Object3D[] = [...Object.entries(w.people).filter(([id, p]) => p.def.azevi && id !== 'ayaba').map(([, p]) => p.root), ...this.statues.map((s) => s.p.root)];
+    const glow = new THREE.MeshBasicMaterial({ color: 0xfff4dc, transparent: true, opacity: 0.85 });
+    const sprout = new THREE.Group();
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, 0.7, 8), new THREE.MeshStandardMaterial({ color: 0x4a3a20 }));
+    trunk.position.y = 0.35;
+    sprout.add(trunk);
+    const leafM = new THREE.MeshStandardMaterial({ color: 0x5aa83a, emissive: 0x2a5a1a, emissiveIntensity: 0.5, side: THREE.DoubleSide });
+    for (let i = 0; i < 6; i++) { const l = new THREE.Mesh(new THREE.CircleGeometry(0.12, 8), leafM); l.position.set(Math.cos(i) * 0.12, 0.55 + i * 0.03, Math.sin(i) * 0.12); l.rotation.set(-1, i, 0); sprout.add(l); }
+    sprout.position.set(0.2, 2.15, -19.8);
+    sprout.scale.setScalar(0.01);
+    this.scene.add(sprout);
+    const ay = w.people['ayaba'];
+    const fired = new Set<string>();
+    const at = (k: string, t: number, now: number, f: () => void) => { if (now >= t && !fired.has(k)) { fired.add(k); f(); } };
+    let done = false;
+    this.director.play({
+      duration: 46,
+      update: (t, dt) => {
+        h?.update(dt);
+        // l'aube se lève pendant toute la scène
+        story.minutes = Math.min(29 * 60 + 40, 28 * 60 + 30 + t * 4);
+        if (t < 14) {
+          // les âmes s'élèvent en lumière au-dessus de la station
+          this.camera.position.set(31, 2 + t * 0.15, 4);
+          this.camera.lookAt(38.6, 2 + t * 0.6, -6.6);
+          for (const s of souls) {
+            if (t > 2 && !s.userData.freed) { s.userData.freed = true; s.traverse((o) => { if ((o as THREE.Mesh).isMesh) { (o as THREE.Mesh).material = glow; o.layers.enableAll(); } }); }
+            if (s.userData.freed) s.position.y += dt * (0.6 + (s.id % 5) * 0.15);
+          }
+        }
+        at('souls', 2, t, () => { this.audio.sfx('souls', { gain: 1 }); this.audio.loop('dawn', 0.6, 'music/dawn.mp3'); });
+        // Houngbo est jugé : la terre le reprend, dans le feu
+        at('judge', 6, t, () => { this.line('houngbo_judged', 5); this.audio.sfx('judged', { gain: 1 }); if (h) { for (const o of this.houngboSeen) o.visible = true; h.root.visible = true; h.root.position.set(36, 0, -2); h.play('Hit_Chest', 0.1, true); } });
+        if (h && t > 7 && t < 14) { h.root.position.y -= dt * 0.5; if (Math.random() < dt * 8) w.fx.burstEmbers(h.root.position.clone().setY(0.3), 20, 1, 2); }
+        // Ayaba dit au revoir au bord de l'eau
+        at('ayaba', 14, t, () => { if (ay) { ay.root.position.set(1, 0, -40); ay.root.rotation.y = 0; ay.root.visible = true; ay.play('Idle_Talking_Loop'); } this.line('ayaba_goodbye', 9); });
+        if (t >= 14 && t < 26) { this.camera.position.set(1.2, 1.3, -36.2); this.camera.lookAt(1, 1.0, -40); }
+        if (ay && t > 22 && t < 26) { ay.root.position.z -= dt * 1; ay.root.scale.setScalar(Math.max(0.01, 1 - (t - 22) / 4)); }
+        // une pousse d'iroko perce la souche de Loko
+        if (t >= 26 && t < 36) { this.camera.position.set(1.8, 2.7, -17.4); this.camera.lookAt(0.2, 2.35, -19.8); sprout.scale.setScalar(Math.min(1, (t - 26) / 6)); }
+        at('hornbill', 28, t, () => this.audio.sfx('hornbill', { gain: 1 }));
+        // Happy appelle sa mère : le réseau revient avec le jour
+        at('call', 36, t, () => { this.phone.notify('phone', 'Mum ❤️', 'Calling…', 5); this.line('happy_mom', 8); });
+        if (t >= 36) { this.camera.position.set(2, 1.65, -10 + (t - 36) * 0.4); this.camera.lookAt(0, 6 + (t - 36) * 0.6, -60); }
+      },
+      end: () => {
+        if (done) return;
+        done = true;
+        markEnding('healer');
+        this.postCredits();
+      },
+    });
+  }
+
+  // Scène après le générique : un an plus tard, quelqu'un tombe en panne devant le panneau…
+  private postCredits(): void {
+    this.director.fadeTo(1, 1.2);
+    setTimeout(() => {
+      story.minutes = 19 * 60 + 40;
+      this.world.hazardsOn = true;
+      const happy = buildPerson(this.models, { id: 'healer-happy', sex: 'm', height: 1.8, skin: '#5a3a26', top: 'chemise', wax: ['#efe9dc', '#d8c8a8', '#c8a86a'], pants: '#2a241e', azevi: false, pose: 'Idle_Loop' });
+      happy?.play('Walk_Loop');
+      if (happy) { happy.root.position.set(1.5, 0, 52); happy.root.rotation.y = 0; this.scene.add(happy.root); }
+      const lamp = instance(this.models, 'az-lamp', 1.4);
+      if (lamp && happy) { lamp.position.set(0.32, 0.75, 0.1); happy.root.add(lamp); }
+      this.director.fadeTo(0, 1.5);
+      this.director.title('ONE YEAR LATER', '', 4);
+      let done = false;
+      const fired = new Set<string>();
+      this.director.play({
+        duration: 16,
+        update: (t, dt) => {
+          happy?.update(dt);
+          if (happy && t < 9) happy.root.position.z += dt * 1.2;
+          this.camera.position.set(2.4, 1.6, 67);
+          this.camera.lookAt(1.5, 1.4, happy ? happy.root.position.z : 60);
+          if (t > 9 && !fired.has('l')) { fired.add('l'); happy?.play('Idle_Talking_Loop'); this.line('happy_postcredit', 6); }
+        },
+        end: () => {
+          if (done) return;
+          done = true;
+          this.finalScreen('Ending IV — The Last Healer', ['The rite frees the souls. Mama Dossi and the villagers rise into the light. Houngbo is judged by the ancestors.',
+            'Ayaba says goodbye. A shoot of iroko breaks through the stump of Loko.', 'Happy calls his mother: “I’m going to stay a little while.”', 'One year later, a car breaks down in front of the sign — repainted. A man with a calabash walks up, a lamp in his hand.']);
+        },
+      });
+    }, 1300);
+  }
+
   // Un personnage marche le long d'un chemin, puis s'arrête
   private walkers: { id: string; path: THREE.Vector3[] }[] = [];
   private walk(id: string, path: THREE.Vector3[]): void {
@@ -1571,15 +2072,16 @@ export class Game {
     this.walkers = this.walkers.filter((w) => w.path.length);
   }
 
-  // Fin I (The Survivor) — ou fin II si la Marque est à 3 (la voiture ne démarre pas)
-  private ending(): void {
-    this.mode = 'dead';
-    this.hud.hideAll();
-    document.exitPointerLock();
-    if (story.marque >= 3) {
-      this.gameOver.showEnding('Ending II — The Azévi', ['The engine coughs, then nothing. In the rear-view mirror, your own face is ash.', 'Later, headlights on the road. You stand up. You walk towards them, smiling.']);
+  // Fin I (The Survivor) — ou fin II si la Marque est à 3, ou si l'aube trouve Happy encore au village
+  private ending(dawn = false): void {
+    if (story.marque >= 3 || dawn) {
+      markEnding('azevi');
+      this.finalScreen('Ending II — The Azévi', dawn
+        ? ['Dawn finds you still in Azé-tin. You sit down in front of a hut, and you cannot remember why you wanted to leave.', 'Later, headlights on the road. You stand up. You walk towards them, smiling.']
+        : ['The engine coughs, then nothing. In the rear-view mirror, your own face is ash.', 'Later, headlights on the road. You stand up. You walk towards them, smiling.']);
     } else {
-      this.gameOver.showEnding('Ending I — The Survivor', ['You drive towards the dawn. The radio comes back. You call your mother, and you laugh, and you cannot stop.',
+      markEnding('survivor');
+      this.finalScreen('Ending I — The Survivor', ['You drive towards the dawn. The radio comes back. You call your mother, and you laugh, and you cannot stop.',
         'In the rear-view mirror, on the back seat, an owl is watching you.', 'Azé-tin is waiting for the next one.']);
     }
   }
@@ -1626,7 +2128,7 @@ export class Game {
     this.director.update(dt);
 
     this.hud.update(dt);
-    this.phone.tick();
+    this.phone.tick(dt);
     this.audio.update();
 
     this.renderer.render(this.scene, this.camera);
@@ -1656,7 +2158,7 @@ export class Game {
       else this.line('happy_flash_low', 4);
     }
 
-    this.player.update(dt, this.input, locked && !this.phone.open);
+    this.player.update(dt, this.input, locked && !this.phone.open && this.rite?.phase !== 3);
 
     // Batterie : le flash et l'écran du téléphone la vident, le 4×4 la recharge
     const nearCar = this.player.pos.distanceTo(this.world.points.car) < 3.4;
@@ -1728,6 +2230,7 @@ export class Game {
       setTimeout(() => {
         if (this.mode !== 'playing') return;
         const dir = this.player.forward(this.v1).clone();
+        if (this.riteStrike(dir, weapon.range)) return;
         this.strikePeople(dir, weapon.range);
         const hits = this.enemies.strike(this.player.pos, dir, weapon.range, weapon.power);
         if (hits.length) {
@@ -1752,6 +2255,7 @@ export class Game {
         this.kaolinFx.burst(this.camera.position.clone().addScaledVector(dir, 0.6).setY(1.3), 70, dir);
         const n = this.enemies.repel(this.player.pos, dir, 6, 40);
         this.kaolinStatues(dir);
+        this.riteKaolin(dir, n);
         if (this.grab && n) { this.grab = null; this.hud.setGrabbed(false); }
         if (n) this.audio.voiceMix('aaah', 'm', { ghost: true, gain: 0.7, rate: 0.7 });
       }
@@ -1763,7 +2267,7 @@ export class Game {
     if (!this.fb) this.enemies.update(dt, this.player.pos, nearCar);
 
     // ---- Le hibou et son QTE : se cacher (C) ou regarder dans le rétroviseur ----
-    if (this.time > this.nextOwl && !this.owlQte && !this.fb) {
+    if (this.time > this.nextOwl && !this.owlQte && !this.fb && !this.rite && !hasFlag('ended')) {
       this.audio.sfx('owl', { pan: Math.random() * 2 - 1 });
       if (!hasFlag('firstOwl')) {
         setFlag('firstOwl');
@@ -1790,7 +2294,7 @@ export class Game {
       }
     }
 
-    if (!this.fb) this.guide();
+    if (!this.fb && !this.rite) this.guide();
     this.beats(dt);
 
     // ---- Souffle : remonte lentement si rien ne frappe, vite au 4×4 ----

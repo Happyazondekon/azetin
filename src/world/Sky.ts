@@ -114,6 +114,9 @@ export class Sky {
   }
 
   // minutes = heure du jeu (19h = 1140) ; camera = pour garder le ciel centré sur Happy
+  smoke = 0; // 0 à 1
+  private smokeColor = new THREE.Color(0x2a2420);
+
   update(minutes: number, camera: THREE.Camera): void {
     let m = minutes;
     if (m < 12 * 60) m += 24 * 60; // après minuit
@@ -126,7 +129,8 @@ export class Sky {
     mix(a.top, b.top, t, this.uniforms.uTop.value);
     mix(a.hor, b.hor, t, this.uniforms.uHor.value);
     mix(a.fog, b.fog, t, this.fog.color);
-    this.fog.density = lerp(a.fogD, b.fogD);
+    this.fog.density = lerp(a.fogD, b.fogD) + this.smoke * 0.09; // la fumée de Houngbo (combat final)
+    if (this.smoke > 0) this.fog.color.lerp(this.smokeColor, this.smoke * 0.8);
     mix(a.hemiSky, b.hemiSky, t, this.hemi.color);
     mix(a.hemiGround, b.hemiGround, t, this.hemi.groundColor);
     this.hemi.intensity = lerp(a.hemi, b.hemi);

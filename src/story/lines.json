@@ -251,5 +251,61 @@
   "houngbo_feast": {
     "who": "houngbo",
     "text": "Drink, my people! Tonight, Azé-tin is rich! Tonight, nobody goes to bed!"
+  },
+  "houngbo_thanks": {
+    "who": "houngbo",
+    "text": "Thank you, traveller. Now my village will never be judged. And neither will I."
+  },
+  "happy_burn": {
+    "who": "happy",
+    "text": "Forgive me, old man. I just want to go home."
+  },
+  "agossou_rite": {
+    "who": "agossou",
+    "text": "Put the plants on the asen, one by one. Sing with me. He will come... Do not stop singing."
+  },
+  "houngbo_rite1": {
+    "who": "houngbo",
+    "text": "You think white earth can stop a chief? My people! Bring him to me!"
+  },
+  "houngbo_rite2": {
+    "who": "houngbo",
+    "text": "I am the smoke now, traveller. Look for me... if you dare."
+  },
+  "houngbo_rite3": {
+    "who": "houngbo",
+    "text": "Sing, then. Sing until your breath is mine!"
+  },
+  "chant_1": {
+    "who": "agossou",
+    "text": "Ancestors, open the road. Your children are coming home."
+  },
+  "chant_2": {
+    "who": "agossou",
+    "text": "Earth, take back the fire. Water, wash away the ash."
+  },
+  "chant_3": {
+    "who": "agossou",
+    "text": "Loko, grow again. Azé-tin, sleep in peace."
+  },
+  "houngbo_judged": {
+    "who": "houngbo",
+    "text": "No... not the ancestors... not their eyes... NO!"
+  },
+  "ayaba_goodbye": {
+    "who": "ayaba",
+    "text": "Thank you, Happy. The water is warm now. Tell the next traveller... Kossi is waiting."
+  },
+  "happy_mom": {
+    "who": "happy",
+    "text": "Mum? ...Yes. I'm fine. I'm in Papa's village. I'm going to stay a little while."
+  },
+  "happy_postcredit": {
+    "who": "happy",
+    "text": "You're looking for Kossi? Everyone who arrives here is looking for Kossi."
+  },
+  "happy_dawn": {
+    "who": "happy",
+    "text": "The sky is turning grey... Dawn. I'm out of time."
   }
 }

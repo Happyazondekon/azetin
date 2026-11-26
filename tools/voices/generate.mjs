@@ -121,6 +121,8 @@ async function sfx() {
 async function music() {
   const tracks = {
     theme: { prompt: 'Slow haunting West African horror theme: a kora playing a sparse minor melody, a low talking drum like a heartbeat, distant female choir humming, dark ambient pads, cinematic, unsettling, instrumental', ms: 90000 },
+    rite: { prompt: 'West African healing ritual chant at night: a deep male voice and a choir humming, talking drums, rattles and a kora, rising and solemn, hopeful by the end, instrumental feel with wordless voices', ms: 120000 },
+    dawn: { prompt: 'Peaceful dawn over an African lagoon after a long night: soft kora, gentle strings, birds, warm and bittersweet, instrumental', ms: 60000 },
     tension: { prompt: 'Dark tense horror underscore for being chased at night in an African village: pulsing low drums, dissonant strings, breathing textures, no melody, loopable, instrumental', ms: 45000 },
   };
   const dir = out('public/music');
