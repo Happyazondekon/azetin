@@ -1,0 +1,20 @@
+{
+  "name": "azetin",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AZETIN: The Last Healer — survival-horror navigateur (OpenGame Game Jam #1)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.187.0",
+    "typescript": "^5.9.0",
+    "vite": "^6.3.0"
+  }
+}
