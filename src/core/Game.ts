@@ -83,6 +83,7 @@ export class Game {
   private blackout = 0;                       // la torche se coupe une fraction de seconde
   private dossiLaughT = 0;
   private kossiAsking = false;
+  private creditsOn = false;
   // ---- Acte II
   private pickups: Pickup[] = [];
   private hornbill!: THREE.Object3D;
@@ -333,6 +334,7 @@ export class Game {
 
   private togglePhone(): void {
     if (this.mode !== 'playing') return;
+    if (!this.phone.open && !hasFlag('phoneOpened')) setFlag('phoneOpened');
     if (this.phone.open) {
       this.phone.hide();
       this.lock();
@@ -766,8 +768,10 @@ export class Game {
         this.director.fadeTo(0, 2);
         this.director.title('THE VILLAGE THAT SLEEPS', 'ACT I', 4.5);
         setFlag('intro');
+        // noir complet : le joueur découvre son smartphone, d'abord la torche
+        this.flashOn = false;
         setTimeout(() => { this.line('prologue_flat', 5); }, 1800);
-        setTimeout(() => this.hud.objective(story.objective), 6500);
+        setTimeout(() => this.hud.say('[Pitch dark. Your phone is in your pocket — press F for the torch.]', 6), 6500);
         this.nextOwl = this.time + 40;
         this.save();
       },
@@ -1766,7 +1770,9 @@ export class Game {
     this.hud.hideAll();
     this.hud.setKaolin(null);
     this.audio.loop('credits', 0.6, dawn ? 'music/dawn.mp3' : 'music/theme.mp3');
+    this.creditsOn = true; // le village 3D n'est plus dessiné derrière le générique
     await new Credits().play(dawn, last);
+    this.creditsOn = false;
     this.audio.loop('credits', 0, dawn ? 'music/dawn.mp3' : 'music/theme.mp3');
   }
 
@@ -1792,7 +1798,9 @@ export class Game {
     document.exitPointerLock();
     await this.gameOver.endingCard(title, lines, 16);
     await this.rollCredits(dawn, dawn ? 'Azé-tin sleeps in peace.' : 'Azé-tin is waiting.');
-    location.reload(); // l'accueil, avec un village tout neuf
+    // l'accueil, avec un village tout neuf (fondu au noir pendant le rechargement)
+    document.body.style.background = '#000';
+    location.reload();
   }
 
   // ---------------------------------------------------------------- choix IV : le rite
@@ -2301,6 +2309,7 @@ export class Game {
     this.phone.tick(dt);
     this.audio.update();
 
+    if (this.creditsOn) return;
     this.renderer.render(this.scene, this.camera);
     if (this.mode === 'playing') this.mirror.render(this.renderer, this.scene);
     if (this.mode === 'dead') this.camera.position.y = Math.max(0.35, this.camera.position.y - dt * 1.2); // Happy s'effondre
@@ -2422,7 +2431,14 @@ export class Game {
     if (this.input.wasPressed('Tab') && !this.fb) this.togglePhone();
     if (this.input.wasPressed('KeyM')) this.openMap();
     if (this.input.wasPressed('KeyF')) {
-      if (story.battery > 5) this.flashOn = !this.flashOn;
+      if (story.battery > 5) {
+        this.flashOn = !this.flashOn;
+        if (this.flashOn && !hasFlag('torchOn')) {
+          setFlag('torchOn');
+          this.audio.ui('click');
+          setTimeout(() => this.phone.notify('phone', 'No signal', 'Searching for network… Press Tab to check your phone.'), 1500);
+        }
+      }
       else this.line('happy_flash_low', 4);
     }
 

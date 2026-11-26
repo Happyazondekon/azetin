@@ -4,7 +4,7 @@
 //  puis retombe en cendre. Des yeux de hibou s'ouvrent parfois dans le noir.
 //  Après la vraie fin (IV), le même générique se joue en blanc kaolin et or, à l'aube.
 // =============================================================
-type Card = { small?: string; big: string; size?: number };
+type Card = { small?: string; big: string; size?: number; below?: string };
 
 const CARDS: Card[] = [
   { big: 'AZETIN', small: 'THE LAST HEALER', size: 1.6 },
@@ -26,6 +26,7 @@ export class Credits {
   private g: CanvasRenderingContext2D;
   private done: (() => void) | null = null;
   private raf = 0;
+  private guard = 0;
   private skipHandler = (e: KeyboardEvent | MouseEvent) => {
     if (e instanceof KeyboardEvent && e.code !== 'Space' && e.code !== 'Escape') return;
     this.finish();
@@ -42,7 +43,7 @@ export class Credits {
     document.body.appendChild(this.cv);
     const W = (this.cv.width = innerWidth), H = (this.cv.height = innerHeight);
     const g = this.g;
-    const cards = [...CARDS, { big: lastLine, size: 0.85 }];
+    const cards: Card[] = [...CARDS, { big: lastLine, size: 0.85 }, { small: 'Thank you for playing', big: 'AZETIN', size: 1.3, below: 'The Last Healer' }];
     const N = 4200;
     const parts: P[] = Array.from({ length: N }, () => ({ x: Math.random() * W, y: H + Math.random() * H, tx: 0, ty: 0, vx: 0, vy: 0, s: 1 + Math.random() * 1.8, d: Math.random() }));
     // les pixels d'un carton deviennent des cibles pour les particules
@@ -59,6 +60,10 @@ export class Credits {
       const big = Math.min(W / (c.big.length * 0.62), H * 0.13) * k;
       og.font = `600 ${big}px Georgia, 'Times New Roman', serif`;
       og.fillText(c.big, W / 2, H / 2 + big * 0.3);
+      if (c.below) {
+        og.font = `600 ${Math.max(20, big * 0.36)}px Georgia, 'Times New Roman', serif`;
+        og.fillText(c.below.toUpperCase().split('').join(' '), W / 2, H / 2 + big * 0.3 + big * 0.62);
+      }
       if (c.small) {
         og.font = `500 ${Math.max(14, big * 0.26)}px system-ui, sans-serif`;
         og.fillText(c.small.toUpperCase().split('').join(' '), W / 2, H / 2 - big * 0.75);
@@ -75,10 +80,12 @@ export class Credits {
     let eyes = 0, eyesX = W * 0.8, eyesY = H * 0.25;
     return new Promise((resolve) => {
       this.done = resolve;
+      // filet de sécurité : le générique finit toujours, quoi qu'il arrive
+      this.guard = window.setTimeout(() => this.finish(), (cards.length * CARD + 4) * 1000);
       addEventListener('keydown', this.skipHandler);
       this.cv.addEventListener('click', this.skipHandler);
       const frame = (now: number) => {
-        const dt = Math.min(0.05, (now - last) / 1000);
+        const dt = Math.min(0.25, (now - last) / 1000); // en temps réel, même si l'ordinateur rame
         last = now;
         T += dt; // le temps du film avance avec les images : rien ne se désynchronise si l'ordinateur rame
         const ci = Math.floor(T / CARD);
@@ -143,7 +150,7 @@ export class Credits {
         // les yeux du hibou s'ouvrent dans le noir, puis se ferment
         if (eyes > 0) {
           eyes -= dt;
-          const open = Math.sin(Math.min(1, eyes / 1.4) * Math.PI);
+          const open = Math.max(0, Math.sin(Math.min(1, Math.max(0, eyes) / 1.4) * Math.PI)); // jamais négatif : sinon le dessin plante et le générique se fige
           g.globalCompositeOperation = 'lighter';
           for (const sx of [-1, 1]) {
             const rg = g.createRadialGradient(eyesX + sx * 22, eyesY, 0, eyesX + sx * 22, eyesY, 14);
@@ -165,6 +172,7 @@ export class Credits {
 
   private finish(): void {
     cancelAnimationFrame(this.raf);
+    clearTimeout(this.guard);
     removeEventListener('keydown', this.skipHandler);
     this.cv.removeEventListener('click', this.skipHandler);
     this.cv.classList.add('out');

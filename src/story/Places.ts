@@ -62,6 +62,9 @@ export function setAyabaPos(f: () => { x: number; z: number }): void {
 const at = (id: string) => () => ({ x: place(id).x, z: place(id).z });
 
 export const STEPS: Step[] = [
+  // ---- tout début : le smartphone (la torche, puis le téléphone lui-même)
+  { id: 'torch', text: 'It’s pitch dark. Turn on your phone’s torch', hint: 'Press F to switch the torch on or off. It drains the battery.', target: () => null, done: () => hasFlag('torchOn') || hasFlag('trunk') },
+  { id: 'phone', text: 'Check your phone', hint: 'Press Tab: map, messages, notes, photos, settings. Tab again to put it away.', target: () => null, done: () => hasFlag('phoneOpened') || hasFlag('trunk') },
   { id: 'trunk', text: 'Search the trunk of your 4×4', hint: 'Walk to the back of the car and press E.', target: () => ({ x: 1.2, z: 71 }), done: () => hasFlag('trunk') },
   { id: 'road', text: 'Walk up the road towards the lights', hint: 'Follow the red dirt road north, past the burnt sign.', target: at('stele'), done: () => story.discovered.includes('stele') || hasFlag('ayaba') },
   { id: 'ayaba', text: 'Talk to the little girl by the stone', hint: 'She is waiting next to the stone of the dead.', target: () => ayabaPos(), done: () => hasFlag('ayaba') },
