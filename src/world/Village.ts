@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { instance, type Models, type ModelName } from './Assets';
-import { buildPerson, type Person, type PersonDef } from './People';
+import { buildPerson, randomLook, type Person, type PersonDef } from './People';
 import { Sky } from './Sky';
 import { FireSystem, type FireHandle } from './Fire';
 import { PATHS } from '../story/Places';
@@ -290,18 +290,13 @@ export function buildVillage(scene: THREE.Scene, models: Models): World {
     if (def.id !== 'ayaba') addRect(x, z, 0.6, 0.6); // Ayaba se déplace : pas d'obstacle fixe
   };
   // Kossi, vivant, dans son atelier
-  place({ id: 'kossi', sex: 'm', height: 1.8, skin: '#4e3020', top: 'chemise', wax: ['#2b3f63', '#c9a23a', '#e8e0cc'], hair: 'short04', beard: true, azevi: false, pose: 'Idle_Loop', pants: '#3a3226' }, -16, 5.2, 0);
+  place({ id: 'kossi', sex: 'm', height: 1.8, skin: '#4e3020', top: 'chemise', wax: ['#2b3f63', '#c9a23a', '#e8e0cc'], hair: 'short04', beard: true, azevi: false, pose: 'Idle_Loop', pants: '#3a3226', shoe: 'tapette', shoeColor: ['#2f6fb3', '#1c2440'] }, -16, 5.2, 0);
   // Mama Dossi, Azévi, derrière son comptoir
-  place({ id: 'dossi', sex: 'f', height: 1.66, skin: '#5b3a26', top: 'robe', wax: ['#a8261c', '#f2c14e', '#1d3557'], gele: true, azevi: true, pose: 'Idle_Talking_Loop', slow: 0.7 }, 9, 6.0, 0);
+  place({ id: 'dossi', sex: 'f', height: 1.66, skin: '#5b3a26', top: 'robe', wax: ['#a8261c', '#f2c14e', '#1d3557'], gele: true, shoe: 'babouche', shoeColor: ['#d8cfb8', '#6a4a2a'], azevi: true, pose: 'Idle_Talking_Loop', slow: 0.7 }, 9, 6.0, 0);
   // Ayaba, 10 ans : morte noyée, pas brûlée (elle n'est pas Azévi). Elle attend Happy près de la stèle.
-  place({ id: 'ayaba', sex: 'f', height: 1.3, skin: '#4a2e1e', top: 'haut', wax: ['#e8e0cc', '#2a6f9f', '#f2c14e'], hair: 'braid01', azevi: false, truth: 'wet', child: true, pose: 'Idle_Loop' }, -1.6, 30.5, 0.3);
+  place({ id: 'ayaba', sex: 'f', height: 1.3, skin: '#4a2e1e', top: 'haut', wax: ['#e8e0cc', '#2a6f9f', '#f2c14e'], hair: 'braid01', azevi: false, truth: 'wet', child: true, shoe: 'none', pose: 'Idle_Loop' }, -1.6, 30.5, 0.3);
 
   // Les villageois d'Azé-tin (tous Azévi) : immobiles devant leurs cases, assis, accroupis autour d'un feu
-  const SK = ['#3e281b', '#4a2e1e', '#5b3a26', '#4e3020', '#38241a'];
-  const WX: [string, string, string][] = [
-    ['#4a3a2a', '#8a6a3a', '#d8c8a0'], ['#2a6f5f', '#e9c46a', '#f4a261'], ['#5a4a2a', '#2a1d16', '#c9a23a'], ['#3a2a4a', '#c97b2a', '#e8e0cc'],
-    ['#6a2a2a', '#e0b050', '#2a2a2a'], ['#1d3557', '#a8dadc', '#e63946'], ['#3a4a2a', '#c0a060', '#e8e0cc'], ['#5a2a4a', '#f0c0a0', '#2a1a2a'],
-  ];
   type V = [number, number, number, 'm' | 'f', PersonDef['pose'], number?];
   const villagers: V[] = [
     [-8, -4.4, 0, 'm', 'Idle_Loop'], [20, 16.6, 0.4, 'f', 'Idle_Loop'], [7, 23.4, -0.3, 'm', 'Idle_Loop'], [-23, -3.6, 0.2, 'f', 'Idle_Loop'],
@@ -313,12 +308,9 @@ export function buildVillage(scene: THREE.Scene, models: Models): World {
     [-6, -44, 3.1, 'm', 'Idle_Loop'], [4, -44.5, 2.9, 'f', 'Idle_Loop'],
   ];
   villagers.forEach(([x, z, ry, sex, pose, slow], i) => {
-    place({
-      id: `v${i}`, sex, height: sex === 'm' ? 1.68 + (i % 3) * 0.05 : 1.58 + (i % 3) * 0.04, skin: SK[i % SK.length],
-      top: sex === 'm' ? (i % 2 ? 'chemise' : 'bomba') : (i % 2 ? 'robe' : 'haut'), wax: WX[i % WX.length],
-      hair: sex === 'm' ? 'short04' : i % 3 ? 'braid01' : undefined, gele: sex === 'f' && i % 3 === 0, beard: sex === 'm' && i % 2 === 0,
-      pants: ['#2a241e', '#1f1c18', '#3a3226'][i % 3], azevi: true, pose, slow: slow ?? 0.12,
-    }, x, z, ry);
+    // chaque habitant a sa propre allure (tenue, coiffure, chaussures, visage, âge)
+    const { elder, ...look } = randomLook(`azetin-v${i}`, sex);
+    place({ id: `v${i}`, ...look, azevi: true, pose, slow: slow ?? (elder ? 0.08 : 0.12) }, x, z, ry);
   });
 
   // --- Feux et lampes : des flammes qui brûlent pour personne ---

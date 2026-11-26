@@ -22,7 +22,7 @@ import { markEnding, endingsSeen } from '../ui/Endings';
 import { Credits } from '../ui/Credits';
 import { LAYER_SEEN, LAYER_TRUTH } from '../world/Village';
 import LINES from '../story/lines.json';
-import { buildPerson, type Person } from '../world/People';
+import { buildPerson, randomLook, type Person } from '../world/People';
 import { story, resetStory, loadGame, saveGame, hasSave, hasFlag, setFlag, clearSave } from '../story/State';
 
 type Mode = 'menu' | 'playing' | 'paused' | 'dead' | 'cine';
@@ -199,7 +199,7 @@ export class Game {
     this.pickups = a2.pickups;
     this.hornbill = a2.hornbill;
     this.kaolinFx = new Sparks(this.scene, 'kaolin');
-    this.houngbo = buildPerson(models, { id: 'houngbo', sex: 'm', height: 1.93, skin: '#4a3224', top: 'bomba', wax: ['#6a1a5a', '#c8a030', '#2a0e24'],
+    this.houngbo = buildPerson(models, { id: 'houngbo', sex: 'm', height: 1.93, skin: '#4a3224', top: 'robe', wax: ['#6a1a5a', '#c8a030', '#2a0e24'], shoe: 'babouche', shoeColor: ['#e0a526', '#7b2cbf'],
       pants: '#2a0e24', beard: true, azevi: true, pose: 'Idle_Talking_Loop', slow: 0.6 });
     if (this.houngbo) { this.houngbo.root.visible = false; this.scene.add(this.houngbo.root); }
     this.buildStatues();
@@ -228,6 +228,16 @@ export class Game {
     // compile les shaders tout de suite (pas de saccade la première fois qu'on voit un feu ou un personnage)
     const unboom = this.world.fx.prewarm();
     const zoo = this.materialZoo();
+    // la garde-robe complète (toutes coiffures, tenues, chaussures) : compilée d'avance, comme le reste
+    for (let i = 0; i < 12; i++) {
+      const sex = i % 2 ? 'f' : 'm';
+      const { elder: _e, ...look } = randomLook(`wardrobe${i}`, sex);
+      const hairs = sex === 'm' ? ['short04', 'short02', 'afro01', 'braid01'] as const : ['braid01', 'afro01', 'bob02', 'long01', 'ponytail01', 'short04'] as const;
+      const shoes = ['sandale', 'babouche', 'tapette', 'derby', 'basket'] as const;
+      const tops = ['bomba', 'chemise', 'robe', 'haut'] as const;
+      const p = buildPerson(models, { ...look, id: `wardrobe${i}`, hair: hairs[(i >> 1) % hairs.length], shoe: shoes[(i >> 1) % shoes.length], top: tops[(i >> 1) % tops.length], gele: i === 3, azevi: i % 3 === 0 });
+      if (p) zoo.add(p.root);
+    }
     this.scene.add(zoo);
     await this.warmup(this.scene);
     this.scene.remove(zoo);

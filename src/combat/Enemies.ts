@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildPerson, type Person, type PersonDef } from '../world/People';
+import { buildPerson, randomLook, type Person } from '../world/People';
 import type { Models } from '../world/Assets';
 
 // Les Brûlés : des Azévi qui ont l'air de villageois ordinaires (dans le rétroviseur, ils brûlent).
@@ -7,12 +7,6 @@ import type { Models } from '../world/Assets';
 
 export type EnemyState = 'stalk' | 'chase' | 'windup' | 'grab' | 'stagger' | 'flee' | 'gone';
 
-const LOOKS: Omit<PersonDef, 'id'>[] = [
-  { sex: 'm', height: 1.78, skin: '#3e281b', top: 'bomba', wax: ['#3a2a1e', '#6a4a2a', '#b8a080'], hair: 'short04', azevi: true, pants: '#2a241e' },
-  { sex: 'f', height: 1.64, skin: '#4a2e1e', top: 'robe', wax: ['#4a2a2a', '#8a3a2a', '#d8b890'], gele: true, azevi: true },
-  { sex: 'm', height: 1.72, skin: '#5b3a26', top: 'chemise', wax: ['#2a3a3a', '#5a6a5a', '#c8c0a0'], hair: 'short04', beard: true, azevi: true, pants: '#1f1c18' },
-  { sex: 'f', height: 1.6, skin: '#3e281b', top: 'haut', wax: ['#2a2a3a', '#6a5a8a', '#e0d0b0'], hair: 'braid01', azevi: true },
-];
 
 export interface Enemy {
   person: Person;
@@ -43,8 +37,9 @@ export class Enemies {
   ) {}
 
   spawn(at: THREE.Vector3, fromOwl: boolean, state: EnemyState = 'chase'): Enemy | null {
-    const look = LOOKS[this.n % LOOKS.length];
-    const person = buildPerson(this.models, { ...look, id: `burnt${this.n++}` });
+    // chaque Brûlé est un ancien habitant différent (tenue, coiffure, chaussures, visage)
+    const { elder: _e, ...look } = randomLook(`burnt${this.n}`, this.n % 2 ? 'f' : 'm');
+    const person = buildPerson(this.models, { ...look, id: `burnt${this.n++}`, azevi: true });
     if (!person) return null;
     const pos = at.clone();
     pos.y = 0;

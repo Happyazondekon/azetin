@@ -12,6 +12,10 @@ export const MODEL_NAMES = [
   // personnages (corps Quaternius aux traits africains, vêtements cousus dans Blender : repris de Dantokpa Dash)
   'body-m', 'body-f', 'anims', 'top-bomba-m', 'top-chemise-m', 'top-robe-f', 'top-haut-f', 'bot-pagne-m', 'bot-pagne-f',
   'hair-short04-m', 'hair-braid01-f', 'hair-beard', 'hat-gele', 'shoe-sandale-m', 'shoe-sandale-f',
+  // plus de variété (Dantokpa Dash) : coiffures, coupes pour les deux sexes, chaussures
+  'hair-afro01-m', 'hair-afro01-f', 'hair-bob02-f', 'hair-braid01-m', 'hair-long01-f', 'hair-ponytail01-f', 'hair-short02-m', 'hair-short04-f',
+  'top-bomba-f', 'top-chemise-f', 'top-haut-m', 'top-robe-m',
+  'shoe-babouche-m', 'shoe-babouche-f', 'shoe-tapette-m', 'shoe-tapette-f', 'shoe-derby-m', 'shoe-derby-f', 'shoe-basket-m', 'shoe-basket-f',
 ] as const;
 
 export type ModelName = (typeof MODEL_NAMES)[number];
