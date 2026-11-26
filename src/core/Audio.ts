@@ -14,6 +14,12 @@ export class Audio {
   private loops = new Map<string, { src: AudioBufferSourceNode; gain: GainNode }>();
   private synthLoops = new Map<string, { gain: GainNode }>();
   private heartT = 0;
+  private muffler: BiquadFilterNode | null = null;
+
+  /** Sous l'eau : tout devient sourd */
+  muffle(on: boolean): void {
+    if (this.muffler && this.ctx) this.muffler.frequency.setTargetAtTime(on ? 380 : 20000, this.ctx.currentTime, on ? 0.15 : 0.6);
+  }
 
   start(): void {
     if (this.ctx) {
@@ -26,7 +32,10 @@ export class Audio {
     this.ctx = ctx;
     this.master = ctx.createGain();
     this.master.gain.value = 0.8;
-    this.master.connect(ctx.destination);
+    this.muffler = ctx.createBiquadFilter();
+    this.muffler.type = 'lowpass';
+    this.muffler.frequency.value = 20000;
+    this.master.connect(this.muffler).connect(ctx.destination);
 
     // Bruit blanc réutilisable
     const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);

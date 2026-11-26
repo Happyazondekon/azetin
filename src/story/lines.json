@@ -243,5 +243,13 @@
   "kossi_after": {
     "who": "kossi",
     "text": "You met him. I can see it on your face. Give me the battery. Your car will be ready. Then... you choose."
+  },
+  "agossou_feast": {
+    "who": "agossou",
+    "text": "Dance, Houngbo. Dance on your barrels. The ancestors are watching you tonight."
+  },
+  "houngbo_feast": {
+    "who": "houngbo",
+    "text": "Drink, my people! Tonight, Azé-tin is rich! Tonight, nobody goes to bed!"
   }
 }

@@ -740,9 +740,91 @@ def car4x4(name='az-4x4'):
     finish(objs, name, dist=2.0, max_edge=0.4, prev=dict(target=(0, 0, 1.1), dist=9, elev=0.25, az=-0.9))
 
 
+# ---------------------------------------------------------------- Acte II : la nuit de la fête (flashback)
+def lamp(name='az-lamp'):
+    """lampe tempête à pétrole : réservoir rouillé, globe de verre, armature, anse.
+    C'est elle qui tombe sur les fûts la nuit du feu."""
+    reset(); make_mats()
+    objs = []
+    objs.append(C('l_tank', M['rust'], 0.085, 0.09, 0.07, 0, 0, 0, seg=20))
+    objs.append(C('l_tank2', M['rust'], 0.07, 0.085, 0.025, 0, 0, 0.07, seg=20))
+    glob = lathe('l_globe', M['glass'], [(0.03, 0.0), (0.06, 0.03), (0.07, 0.08), (0.06, 0.13), (0.035, 0.16)], seg=20)
+    glob.location = (0, 0, 0.095)
+    objs.append(glob)
+    objs.append(C('l_flame', M['lamp'], 0.012, 0.002, 0.04, 0, 0, 0.13, seg=8))
+    objs.append(C('l_cap', M['iron'], 0.05, 0.035, 0.04, 0, 0, 0.255, seg=16))
+    for k in range(4):  # armature
+        a = k * math.pi / 2 + math.pi / 4
+        objs.append(between('l_wire' + str(k), M['iron'], (math.cos(a) * 0.085, math.sin(a) * 0.085, 0.09), (math.cos(a) * 0.05, math.sin(a) * 0.05, 0.27), 0.004, seg=5))
+    objs.append(torus('l_handle', M['iron'], 0.07, 0.005, 0, 0, 0.3, rot=(math.pi / 2, 0, 0), seg=20, rs=5))
+    finish(objs, name, dist=0.4, max_edge=0.05, prev=dict(target=(0, 0, 0.15), dist=0.9, elev=0.3, az=-0.8))
+
+
+def drum(name='az-drum'):
+    """tam-tam de la fête : fût de bois sculpté, peau tendue, cordages"""
+    reset(); make_mats()
+    objs = []
+    body = lathe('d_body', M['wood'], [(0.12, 0.0), (0.1, 0.1), (0.09, 0.3), (0.17, 0.55), (0.2, 0.72)], seg=22)
+    objs.append(body)
+    objs.append(C('d_skin', M['akassa'], 0.205, 0.205, 0.015, 0, 0, 0.72, seg=22))
+    objs.append(torus('d_ring', M['wood_dark'], 0.2, 0.012, 0, 0, 0.71, seg=22, rs=6))
+    objs.append(torus('d_ring2', M['wood_dark'], 0.16, 0.012, 0, 0, 0.45, seg=22, rs=6))
+    for k in range(10):
+        a = k * math.pi / 5
+        objs.append(between('d_rope' + str(k), M['canvas'], (math.cos(a) * 0.2, math.sin(a) * 0.2, 0.71), (math.cos(a + 0.3) * 0.16, math.sin(a + 0.3) * 0.16, 0.45), 0.006, seg=4))
+    finish(objs, name, dist=0.8, max_edge=0.1, prev=dict(target=(0, 0, 0.4), dist=2, elev=0.3, az=-0.8))
+
+
+def barrels(name='az-barrels'):
+    """le dépôt de kpayo : une pyramide de fûts de 200 L sous une bâche, des bidons, une palette.
+    Posé à la station pendant le flashback (avant l'explosion)."""
+    reset(); make_mats()
+    objs = []
+    r, h = 0.29, 0.88
+    paints = [M['enamel_red'], M['bluetank'], M['rust'], M['enamel_red'], M['rust']]
+    k = 0
+    for layer, (nx, ny) in enumerate([(5, 3), (4, 2), (3, 1)]):
+        for i in range(nx):
+            for j in range(ny):
+                x = (i - (nx - 1) / 2) * (2 * r + 0.02)
+                y = (j - (ny - 1) / 2) * (2 * r + 0.02) + layer * 0.3
+                z = layer * (h + 0.01) + 0.12
+                m = paints[(k * 7) % len(paints)]
+                k += 1
+                objs.append(C(f'b_{layer}{i}{j}', m, r, r, h, x, y, z, seg=18))
+                for zz in (0.25, 0.62):
+                    objs.append(torus(f'b_rib{layer}{i}{j}{zz}', M['iron'], r + 0.005, 0.012, x, y, z + zz * h, seg=18, rs=4))
+                objs.append(C(f'b_top{layer}{i}{j}', M['iron'], r * 0.95, r * 0.95, 0.01, x, y, z + h, seg=18))
+    objs.append(B('b_pallet', M['wood'], 3.4, 2.0, 0.12, 0, 0, 0.06))
+    # bâche à moitié tirée sur le haut de la pile
+    objs.append(B('b_tarp', M['canvas'], 1.9, 0.9, 0.03, -0.2, 0.55, 3 * (h + 0.01) + 0.12, rot=(0.25, 0.05, 0)))
+    for i in range(6):  # bidons jaunes au pied
+        objs.append(B('b_can' + str(i), M['orange'], 0.24, 0.16, 0.36, -1.6 + i * 0.3, -1.2, 0.18, bevel=0.02))
+    finish(objs, name, dist=2.5, max_edge=0.3, prev=dict(target=(0, 0, 1.2), dist=7, elev=0.25, az=-0.9))
+
+
+def throne(name='az-throne'):
+    """le siège du chef Houngbo pour la fête : tabouret royal sculpté, dossier, parasol de cérémonie"""
+    reset(); make_mats()
+    objs = []
+    objs.append(B('t_seat', M['wood_dark'], 0.7, 0.55, 0.08, 0, 0, 0.48, bevel=0.02))
+    objs.append(lathe('t_foot', M['wood_dark'], [(0.25, 0), (0.12, 0.15), (0.09, 0.3), (0.2, 0.44)], seg=16))
+    objs.append(B('t_back', M['wood_dark'], 0.7, 0.07, 0.75, 0, 0.27, 0.9, bevel=0.03))
+    objs.append(B('t_backtop', M['orange'], 0.76, 0.09, 0.08, 0, 0.27, 1.3, bevel=0.02))
+    for x in (-0.3, 0.3):
+        objs.append(B('t_post' + str(x), M['wood_dark'], 0.07, 0.07, 1.3, x, 0.27, 0.65, bevel=0.01))
+    objs.append(B('t_base', M['wood_dark'], 0.8, 0.65, 0.06, 0, 0.05, 0.03, bevel=0.01))
+    objs.append(C('t_pole', M['wood'], 0.025, 0.025, 2.6, 0.55, 0.35, 0, seg=8))
+    para = lathe('t_para', M['enamel_red'], [(0.0, 0.25), (0.6, 0.05), (0.95, -0.05), (0.97, -0.22)], seg=24)
+    para.location = (0.55, 0.35, 2.4)
+    objs.append(para)
+    finish(objs, name, dist=1.5, max_edge=0.2, prev=dict(target=(0, 0, 1.0), dist=4.5, elev=0.25, az=-0.8))
+
+
 BUILD = {
     '4x4': car4x4, 'hut-thatch': hut_thatch, 'hut-tin': hut_tin, 'hut-burnt': hut_burnt, 'healer': healer,
     'asen': asen, 'atelier': atelier, 'buvette': buvette, 'station': station, 'stump': stump, 'stele': stele, 'sign': sign,
+    'lamp': lamp, 'drum': drum, 'barrels': barrels, 'throne': throne,
 }
 
 if __name__ == '__main__':

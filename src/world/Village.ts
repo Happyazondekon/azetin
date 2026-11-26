@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { instance, type Models, type ModelName } from './Assets';
 import { buildPerson, type Person, type PersonDef } from './People';
 import { Sky } from './Sky';
+import { FireSystem, type FireHandle } from './Fire';
 import { PATHS } from '../story/Places';
 
 // Village d'Azé-tin. Chaque élément utilise son modèle Blender (.glb) ; s'il manque,
@@ -22,6 +23,8 @@ export interface World {
   fires: THREE.Vector3[];
   car: THREE.Object3D | null;
   flameScale: number[];
+  fx: FireSystem;          // le feu (flammes, braises, fumée, explosion)
+  followGaze: boolean;     // les Azévi tournent la tête vers Happy (coupé pendant le flashback)
   hazardsOn: boolean;      // les warnings du 4×4 (éteints tant qu'il roule)   // intensité de chaque feu (0 = éteint) : feu de la place, lampe du chef, lampe de Mama Dossi
   update(dt: number, t: number, cam: THREE.Vector3): void;
 }
@@ -303,33 +306,36 @@ export function buildVillage(scene: THREE.Scene, models: Models): World {
   });
 
   // --- Feux et lampes : des flammes qui brûlent pour personne ---
+  const fx = new FireSystem(scene);
   const fires: THREE.Vector3[] = [];
-  const flames: THREE.PointLight[] = [];
-  const emberMat = new THREE.MeshBasicMaterial({ color: 0xff7a2a });
+  const flames: FireHandle[] = [];
   const logMat = new THREE.MeshStandardMaterial({ color: 0x1a120c, roughness: 1 });
-  const fire = (x: number, z: number, big: boolean) => {
-    const g = new THREE.Group();
-    for (let k = 0; k < 4; k++) {
-      const log = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.8, 6), logMat);
-      log.rotation.set(Math.PI / 2 - 0.25, k * Math.PI / 2, 0);
-      log.position.y = 0.12;
-      g.add(log);
+  const fire = (x: number, z: number, big: boolean, y = 0) => {
+    if (big) {
+      const g = new THREE.Group();
+      for (let k = 0; k < 5; k++) {
+        const log = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.9, 6), logMat);
+        log.rotation.set(Math.PI / 2 - 0.35, k * Math.PI * 0.4, 0);
+        log.position.y = 0.14;
+        g.add(log);
+      }
+      g.position.set(x, 0, z);
+      scene.add(g);
+      flames.push(fx.add(new THREE.Vector3(x, 0.05, z), 1.15, { smoke: true }));
+    } else {
+      // une lampe tempête (modèle Blender) avec sa petite flamme
+      const lampObj = put('az-lamp', x, z, 0, 1.6, true);
+      if (lampObj) lampObj.position.y = y;
+      flames.push(fx.add(new THREE.Vector3(x, y + 0.2, z), 0.1, { smoke: false, embers: false, color: 0xffb060 }));
     }
-    const coal = new THREE.Mesh(new THREE.ConeGeometry(big ? 0.28 : 0.16, big ? 0.5 : 0.3, 7), emberMat);
-    coal.position.y = big ? 0.3 : 0.2;
-    g.add(coal);
-    g.position.set(x, 0, z);
-    scene.add(g);
-    const l = new THREE.PointLight(0xff7a2a, big ? 9 : 4, big ? 14 : 8, 1.6);
-    l.position.set(x, big ? 0.9 : 1.6, z);
-    scene.add(l);
-    flames.push(l);
     fires.push(new THREE.Vector3(x, 0, z));
-    addRect(x, z, 0.9, 0.9);
+    addRect(x, z, big ? 0.9 : 0.4, big ? 0.9 : 0.4);
   };
   fire(0, 9.4, true);       // feu de la place
-  fire(-27, -16.8, false);  // devant la case du chef (lampe)
-  fire(9.9, 6.5, false);    // lampe à pétrole sur le comptoir de Mama Dossi
+  fire(-27, -16.8, false, 0);    // devant la case du chef (lampe posée au sol)
+  fire(9.9, 6.5, false, 1.02);   // lampe à pétrole sur le comptoir de Mama Dossi
+  // la station couve encore : des braises qui fument dans les ruines, dix ans après
+  for (const [x, z, sz] of [[36.5, -8.5, 0.35], [41, -3.5, 0.25], [34, -4, 0.2], [43, -9, 0.3]]) fx.add(new THREE.Vector3(x, 0.05, z), sz, { smoke: true, light: sz > 0.3 });
 
   let hazardT = 0;
   return {
@@ -353,6 +359,8 @@ export function buildVillage(scene: THREE.Scene, models: Models): World {
     fires,
     car,
     flameScale: [1, 1, 1],
+    fx,
+    followGaze: true,
     hazardsOn: true,
     update(dt, t, cam) {
       // seuls les habitants proches s'animent ; au-delà du brouillard, ils sont cachés
@@ -361,10 +369,11 @@ export function buildVillage(scene: THREE.Scene, models: Models): World {
         p.root.visible = !far;
         if (!far) p.update(dt);
       }
-      flames.forEach((l, i) => (l.intensity = this.flameScale[i] * (i === 0 ? 9 : 4) * (0.85 + 0.15 * Math.sin(t * (9 + i) + i) + 0.08 * Math.sin(t * 23.7 + i))));
+      flames.forEach((f, i) => (f.power = Math.min(1.6, this.flameScale[i])));
+      fx.update(dt, cam);
       // Les Azévi proches tournent la tête (tout le corps) pour suivre Happy, puis reprennent leur pose
       for (const [id, p] of Object.entries(people)) {
-        if (!p.def.azevi || id === 'dossi' || !p.root.visible) continue;
+        if (!this.followGaze || !p.def.azevi || id === 'dossi' || !p.root.visible) continue;
         const base = (p.root.userData.baseRy ??= p.root.rotation.y) as number;
         const dx = cam.x - p.root.position.x, dz = cam.z - p.root.position.z;
         const near = dx * dx + dz * dz < 10 * 10;

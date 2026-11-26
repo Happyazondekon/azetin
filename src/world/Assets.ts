@@ -6,7 +6,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 // ou repris de Dantokpa Dash : arbres, taxi-moto, pneus, fûts, générateur, bidons, pirogue).
 export const MODEL_NAMES = [
   'az-4x4', 'az-hut-thatch', 'az-hut-tin', 'az-hut-burnt', 'az-healer', 'az-asen', 'az-atelier', 'az-buvette',
-  'az-station', 'az-stump', 'az-stele', 'az-sign',
+  'az-station', 'az-stump', 'az-stele', 'az-sign', 'az-lamp', 'az-drum', 'az-barrels', 'az-throne',
   'tr-coco', 'tr-mango', 'tr-neem', 'tr-bush', 'tr-grass',
   'ob-zem', 'ob-tires', 'barrel', 'generator', 'jerrycan', 'pirogue', 'gas-bottle',
   // personnages (corps Quaternius aux traits africains, vêtements cousus dans Blender : repris de Dantokpa Dash)

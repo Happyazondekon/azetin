@@ -154,3 +154,10 @@ Prologue « The Road » (radio, appel à maman, le hibou dans le pare-brise, le 
 ## Acte II — La station (passe 6)
 
 Le calao guide (son grave en deux temps, il crie depuis la direction de ce qu'il reste à trouver). Scène de la souche de Loko (Dah Agossou parle), calebasse et kaolin (touche A en AZERTY / Q en QWERTY, 5 charges, recharge à l'asen), 5 fragments du secret photographiés dans la galerie du téléphone (2 au village, 3 à la station), 3 plantes du guérisseur, flashback jouable de la nuit du feu (au 3e fragment, par les yeux d'Ayaba), et la fin de l'acte : le chef Houngbo, l'éclair de vérité, minuit. Outil de test : `#test` expose `window.game`.
+
+## Acte II, passe « waouh » (passe 7)
+
+- **Le feu** (`src/world/Fire.ts`) : flammes animées par shader (bruit qui monte), braises, fumée, explosion (boule de feu déformée par le bruit, onde de choc, débris, champignon de fumée). Utilisé pour le feu de la place, les lampes, la station qui couve, et le flashback.
+- **Nouveaux modèles Blender** : `az-lamp` (lampe tempête), `az-drum` (tam-tam), `az-barrels` (le dépôt de fûts), `az-throne` (siège du chef et parasol). `python3 tools/blender/azetin.py -- lamp drum barrels throne` puis `node tools/blender/pack-model.mjs az-lamp az-drum az-barrels az-throne`.
+- **Le flashback en film** : la fête (danseurs, tambours, fanions, le chef sur son siège), Dah Agossou qui regarde les fûts, la lampe qui tombe, l'explosion ; puis la fuite jouable dans le village en flammes ; puis la rive, Dah Agossou qui retourne dans le feu, Ayaba qui tombe dans l'eau.
+- **Les gens de cendre** à la station : ils avancent quand on ne les regarde pas ; le kaolin les renvoie.

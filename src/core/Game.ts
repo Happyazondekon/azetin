@@ -16,10 +16,11 @@ import type { Enemy } from '../combat/Enemies';
 import { PLACES, STEPS, currentStep, setAyabaPos } from '../story/Places';
 import { Director } from '../story/Director';
 import { buildAct2Props, type Pickup } from '../world/Act2Props';
+import type { FireHandle } from '../world/Fire';
+import { instance, type ModelName, type Models } from '../world/Assets';
 import { LAYER_SEEN, LAYER_TRUTH } from '../world/Village';
 import LINES from '../story/lines.json';
 import { buildPerson, type Person } from '../world/People';
-import type { Models } from '../world/Assets';
 import { story, resetStory, loadGame, saveGame, hasSave, hasFlag, setFlag } from '../story/State';
 
 type Mode = 'menu' | 'playing' | 'paused' | 'dead' | 'cine';
@@ -30,6 +31,12 @@ interface Interactable {
   pos: THREE.Vector3;
   range: number;
   use: () => void;
+}
+
+// braises et fumée autour d'Ayaba pendant la fuite
+function w_embers(world: World, pos: THREE.Vector3): void {
+  world.fx.burstEmbers(pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 6, 0.3, (Math.random() - 0.5) * 6)), 6, 2, 1.5);
+  if (Math.random() < 0.3) world.fx.emitSmoke(pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 8, 0.5, 2 + Math.random() * 4)), 2.5, 0.8, 5, 0x1c1612);
 }
 
 export class Game {
@@ -83,6 +90,10 @@ export class Game {
   private act2Pending = false;
   private fb: { t: number; ran: boolean; back: [number, number, number]; weapon: string | null; light: THREE.PointLight; done: boolean } | null = null;
   private camFlashEl!: HTMLDivElement;
+  // les gens de cendre de la station : ils avancent quand on ne les regarde pas
+  private statues: { p: Person; home: THREE.Vector3; lastSeen: THREE.Vector3; cd: number; seen: boolean }[] = [];
+  private statueScareT = 0;
+  private exposure = 1.6;
   private lastStep = -1;
   private hereId = '';
   private readonly proj = new THREE.Vector3();
@@ -150,7 +161,7 @@ export class Game {
       onClose: () => this.togglePhone(),
       onSensitivity: (v) => (this.player.sensitivity = v),
       onVolume: (v) => this.audio.setVolume(v),
-      onBrightness: (v) => (this.renderer.toneMappingExposure = v),
+      onBrightness: (v) => (this.renderer.toneMappingExposure = this.exposure = v),
       onMarker: (on) => (this.markerOn = on),
       where: () => ({ x: this.player.pos.x, z: this.player.pos.z, yaw: this.player.yaw, target: this.target() }),
     });
@@ -184,6 +195,7 @@ export class Game {
     this.houngbo = buildPerson(models, { id: 'houngbo', sex: 'm', height: 1.93, skin: '#4a3224', top: 'bomba', wax: ['#6a1a5a', '#c8a030', '#2a0e24'],
       pants: '#2a0e24', beard: true, azevi: true, pose: 'Idle_Talking_Loop', slow: 0.6 });
     if (this.houngbo) { this.houngbo.root.visible = false; this.scene.add(this.houngbo.root); }
+    this.buildStatues();
     this.player = new Player(this.camera, this.world.colliders, this.world.bounds);
     this.enemies = new Enemies(this.scene, models, this.world.colliders, {
       onWindup: (e) => {
@@ -779,7 +791,7 @@ export class Game {
     const pos = this.player.pos;
     const w = this.world;
     if (this.fb) { this.updateFlashback(dt); return; }
-    this.act2Beats();
+    this.act2Beats(dt);
     // 1) La silhouette sur la route
     const fig = this.figure;
     if (fig) {
@@ -853,7 +865,7 @@ export class Game {
   }
 
   // Le calao guide : il crie depuis la direction de ce qu'il reste à trouver
-  private act2Beats(): void {
+  private act2Beats(dt: number): void {
     // les objets de l'Acte II n'apparaissent qu'après l'Acte I, et disparaissent une fois ramassés (aussi après un chargement)
     for (const pk of this.pickups) {
       const taken = hasFlag(pk.kind === 'fragment' ? 'frag_' + pk.id : pk.kind === 'plant' ? 'plant_' + pk.id : 'calabash');
@@ -865,7 +877,8 @@ export class Game {
       this.hornbill.rotation.y = Math.PI * 0.85;
       this.hornbill.visible = true;
     }
-    if (!hasFlag('act1')) return;
+    if (!hasFlag('act1')) { for (const st of this.statues) st.p.root.visible = false; return; }
+    this.updateStatues(dt);
     if (!hasFlag('act2') && this.time > this.nextHornbill) {
       this.nextHornbill = this.time + 40 + Math.random() * 25;
       const t = this.target();
@@ -880,6 +893,90 @@ export class Game {
     if (!hasFlag('act2') && !this.act2Pending && hasFlag('power') && hasFlag('calabash') && story.secret >= 3 && !this.grab) {
       this.act2Pending = true;
       setTimeout(() => this.houngboScene(), 4000);
+    }
+  }
+
+  // ---- Les gens de cendre : figés dans la pose où le feu les a pris
+  private buildStatues(): void {
+    const spots: [number, number, number, string][] = [[35.2, -11.2, 0.4, 'Crouch_Idle_Loop'], [43.6, -0.6, 2.6, 'Idle_Loop'], [45.2, -7.4, -1.9, 'Death01'], [30.6, -6.8, 1.2, 'Crouch_Idle_Loop'], [39.8, -12.4, 0.1, 'Idle_Loop']];
+    spots.forEach(([x, z, ry, pose], i) => {
+      const p = buildPerson(this.models, { id: 'ash' + i, sex: i % 2 ? 'f' : 'm', height: 1.62 + (i % 3) * 0.08, skin: '#1a1410', top: i % 2 ? 'robe' : 'bomba',
+        wax: ['#1a1410', '#221a14', '#100c0a'], pants: '#100c0a', azevi: true, truth: 'burnt', pose: 'Idle_Loop' });
+      if (!p) return;
+      // on ne voit que leur vérité : des corps de cendre, partout, pas seulement dans le rétroviseur
+      p.root.traverse((o) => {
+        if (o.layers.isEnabled(LAYER_SEEN) && !o.layers.isEnabled(LAYER_TRUTH)) o.visible = false;
+        else if (o.layers.isEnabled(LAYER_TRUTH)) o.layers.enable(LAYER_SEEN);
+      });
+      p.root.position.set(x, 0, z);
+      p.root.rotation.y = ry;
+      p.play(pose, 0, pose === 'Death01');
+      p.update(pose === 'Death01' ? 0.35 : 0.6);
+      p.mixers.forEach((m) => (m.timeScale = 0));
+      p.root.visible = false;
+      this.scene.add(p.root);
+      const home = new THREE.Vector3(x, 0, z);
+      this.statues.push({ p, home, lastSeen: home.clone(), cd: 0, seen: true });
+    });
+  }
+
+  private updateStatues(dt: number): void {
+    const active = !hasFlag('act2') && !this.fb;
+    const pos = this.player.pos;
+    const near = pos.distanceTo(this.world.points.station) < 32;
+    const f = this.player.forward(this.v1);
+    this.statueScareT = Math.max(0, this.statueScareT - dt);
+    for (const st of this.statues) {
+      st.p.root.visible = !this.fb;
+      if (!active || !near) continue;
+      st.cd = Math.max(0, st.cd - dt);
+      const d = this.v2.copy(st.p.root.position).sub(pos);
+      d.y = 0;
+      const dist = d.length();
+      const inView = dist < 34 && d.normalize().dot(f) > Math.cos(THREE.MathUtils.degToRad(42)) && this.mirror.raised < 0.5;
+      if (inView) {
+        // quand on se retourne et qu'il est plus près qu'avant : le cœur s'arrête
+        if (!st.seen && st.p.root.position.distanceTo(st.lastSeen) > 1.5 && this.statueScareT <= 0) {
+          this.statueScareT = 9;
+          this.audio.sfx('stinger2', { gain: 0.55 });
+          this.audio.sfx('whispers', { gain: 0.6, pan: this.panOf(st.p.root.position) });
+          this.shake = Math.max(this.shake, 0.12);
+        }
+        st.seen = true;
+        st.lastSeen.copy(st.p.root.position);
+        continue;
+      }
+      st.seen = false;
+      if (st.cd > 0) continue;
+      // il avance… sans bruit, sauf un craquement de braise
+      if (dist > 1.15) {
+        const step = Math.min(dist - 1.1, 2.4 * dt);
+        st.p.root.position.addScaledVector(this.v2.copy(pos).sub(st.p.root.position).setY(0).normalize(), step);
+        st.p.root.rotation.y = Math.atan2(pos.x - st.p.root.position.x, pos.z - st.p.root.position.z);
+        if (Math.random() < dt * 0.4) this.audio.sfx('ember', { gain: 0.35, pan: this.panOf(st.p.root.position) });
+      } else {
+        // il l'a touché : une main de cendre sur la nuque
+        st.cd = 10;
+        this.scare('stinger1', 1);
+        this.audio.sfx('breath', { gain: 1 });
+        this.hurt(16, 'default');
+        this.world.fx.emitSmoke(st.p.root.position.clone().setY(1), 2, 0.6, 3, 0x1a1612);
+        this.world.fx.burstEmbers(st.p.root.position.clone().setY(1), 60, 0.8, 1.5);
+        st.p.root.position.copy(st.home);
+        st.lastSeen.copy(st.home);
+      }
+    }
+  }
+
+  // Le kaolin les renvoie là où le feu les a pris
+  private kaolinStatues(dir: THREE.Vector3): void {
+    for (const st of this.statues) {
+      const d = st.p.root.position.clone().sub(this.player.pos).setY(0);
+      if (d.length() > 6.5 || d.normalize().dot(dir) < 0.3) continue;
+      this.world.fx.emitSmoke(st.p.root.position.clone().setY(1), 2.2, 0.6, 3, 0xd8d2c4);
+      st.p.root.position.copy(st.home);
+      st.lastSeen.copy(st.home);
+      st.cd = 12;
     }
   }
 
@@ -976,92 +1073,419 @@ export class Game {
     });
   }
 
-  // ---------------------------------------------------------------- Flashback : la nuit du feu, par les yeux d'Ayaba
+  // ================================================================ FLASHBACK — LA NUIT DU FEU (un film, puis une fuite jouable)
+  // 1) le film : la fête, le chef sur son siège, Dah Agossou qui regarde les fûts, la lampe qui tombe, l'explosion
+  // 2) la fuite : par les yeux d'Ayaba, à travers le village en flammes, jusqu'à la lagune
+  // 3) la fin : Dah Agossou retourne dans le feu ; Ayaba tombe dans l'eau
+  private fest: {
+    props: THREE.Object3D[]; fires: FireHandle[]; saved: { p: Person; x: number; z: number; ry: number; vis: boolean }[];
+    dancers: Person[]; agossou: Person | null; lamp: THREE.Object3D | null; barrels: THREE.Object3D | null;
+    runners: { p: Person; dir: THREE.Vector3; t: number; fire: FireHandle | null }[];
+  } | null = null;
+
   private startFlashback(): void {
     if (this.mode !== 'playing' || this.fb) { if (!hasFlag('flashback')) setTimeout(() => this.startFlashback(), 3000); return; }
     setFlag('flashback');
+    this.save();
     this.director.fadeTo(1, 1.2);
     this.audio.sfx('stinger3', { gain: 0.6 });
     setTimeout(() => {
       const light = new THREE.PointLight(0xffa040, 0, 120, 1.2);
-      light.position.set(38, 6, -6);
-      this.scene.add(light);
       this.fb = { t: 0, ran: false, back: [this.player.pos.x, this.player.pos.z, this.player.yaw], weapon: this.viewmodel.current, light, done: false };
       this.viewmodel.equip(null);
       this.flashOn = false;
-      this.player.heightScale = 0.62;
-      this.player.place(2.2, 14, -1.25); // sur la place, tournée vers la station
+      this.hud.hideAll();
+      this.hud.setKaolin(null);
       for (const e of this.enemies.list) e.person.root.visible = false;
+      for (const st of this.statues) st.p.root.visible = false;
       if (this.figure) this.figure.root.visible = false;
       this.renderer.domElement.classList.add('flashback');
-      this.world.flameScale = [2.2, 1.5, 1.5];
-      this.audio.loop('festival', 0.6);
+      this.setupFestival();
       this.audio.loop('drone', 0);
-      this.director.fadeTo(0, 1.5);
-      this.director.title('TEN YEARS AGO', 'THE NIGHT OF THE FIRE', 4);
-      this.hud.setTracker('MEMORY', 'You are Ayaba. It is the night of the festival.', '');
-      setTimeout(() => this.line('flash_party', 6), 2500);
+      this.audio.loop('festival', 0.75);
+      this.filmScene();
     }, 1300);
+  }
+
+  // La fête d'il y a dix ans : le dépôt de fûts, le siège du chef, les tambours, les fanions, les danseurs
+  private setupFestival(): void {
+    const w = this.world;
+    const props: THREE.Object3D[] = [];
+    const fires: FireHandle[] = [];
+    const add = (name: ModelName, x: number, y: number, z: number, ry = 0, sc = 1) => {
+      const o = instance(this.models, name, sc);
+      if (!o) return null;
+      o.position.set(x, y, z);
+      o.rotation.y = ry;
+      this.scene.add(o);
+      props.push(o);
+      return o;
+    };
+    const barrels = add('az-barrels', 38, 0, -5, 0);
+    const lamp = add('az-lamp', 38.1, 2.79, -5.55, 0, 1.6);
+    if (lamp) {
+      fires.push(w.fx.add(new THREE.Vector3(38.1, 3.0, -5.55), 0.1, { smoke: false, embers: false, color: 0xffb060 }));
+      const ll = new THREE.PointLight(0xffa050, 14, 10, 1.5);
+      ll.position.set(0, 0.25, 0.15);
+      lamp.add(ll);
+    }
+    // la lumière chaude de la fête au-dessus de la place
+    const festLight = new THREE.PointLight(0xffb070, 60, 30, 1.4);
+    festLight.position.set(0, 5, 9.4);
+    this.scene.add(festLight);
+    props.push(festLight);
+    this.renderer.toneMappingExposure = 2.2;
+    const throneRy = Math.atan2(6.5, 3.9);
+    add('az-throne', -6.5, 0, 5.5, throneRy);
+    add('az-drum', 2.6, 0, 12.8, 0.3);
+    add('az-drum', 3.4, 0, 12.1, -0.4, 0.85);
+    // fanions jaune-vert-rouge et lampes tempête sur des perches autour de la place
+    const poles: [number, number][] = [[-5.5, 4], [5.5, 4], [5.5, 15], [-5.5, 15]];
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 1 });
+    const flagMats = [0x1f7a3a, 0xe0b020, 0xc0201a].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8, side: THREE.DoubleSide, emissive: c, emissiveIntensity: 0.15 }));
+    for (const [x, z] of poles) {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 3.4, 6), poleMat);
+      pole.position.set(x, 1.7, z);
+      this.scene.add(pole);
+      props.push(pole);
+      const l = add('az-lamp', x, 3.15, z, 0, 1.4);
+      if (l) fires.push(w.fx.add(new THREE.Vector3(x, 3.33, z), 0.09, { smoke: false, embers: false, color: 0xffb060 }));
+    }
+    for (let i = 0; i < 4; i++) {
+      const [x0, z0] = poles[i], [x1, z1] = poles[(i + 1) % 4];
+      const n = 12;
+      for (let k = 1; k < n; k++) {
+        const u = k / n;
+        const f = new THREE.Mesh(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-0.13, 0, 0), new THREE.Vector3(0.13, 0, 0), new THREE.Vector3(0, -0.32, 0)]), flagMats[k % 3]);
+        f.geometry.computeVertexNormals();
+        f.position.set(x0 + (x1 - x0) * u, 3.25 - Math.sin(u * Math.PI) * 0.6, z0 + (z1 - z0) * u);
+        f.rotation.y = Math.atan2(x1 - x0, z1 - z0) + Math.PI / 2;
+        this.scene.add(f);
+        props.push(f);
+      }
+    }
+    // les villageois vivants : danseurs autour du feu, batteurs, invités près du chef
+    const saved: { p: Person; x: number; z: number; ry: number; vis: boolean }[] = [];
+    const dancers: Person[] = [];
+    const villagers = Object.entries(w.people).filter(([id, p]) => p.def.azevi && id !== 'dossi').map(([, p]) => p);
+    villagers.forEach((p, i) => {
+      saved.push({ p, x: p.root.position.x, z: p.root.position.z, ry: p.root.rotation.y, vis: p.root.visible });
+      if (i < 9) {
+        const a = (i / 9) * Math.PI * 2;
+        p.root.position.set(Math.cos(a) * 3.3, 0, 9.4 + Math.sin(a) * 3.3);
+        p.root.rotation.y = Math.atan2(-Math.cos(a), -Math.sin(a));
+        p.play('Dance_Loop', 0.2);
+        p.mixers.forEach((m) => (m.timeScale = 0.85 + (i % 3) * 0.1));
+        dancers.push(p);
+      } else if (i < 11) {
+        p.root.position.set(i === 9 ? 2.6 : 3.4, 0, i === 9 ? 13.5 : 12.8);
+        p.root.rotation.y = Math.PI;
+        p.play('Crouch_Idle_Loop', 0.2);
+      } else {
+        const a = (i - 11) * 0.8 + 0.4;
+        p.root.position.set(-6.5 + Math.cos(a) * 2.4, 0, 5.5 + Math.sin(a) * 2.4);
+        p.root.rotation.y = Math.atan2(-6.5 - p.root.position.x, 5.5 - p.root.position.z);
+        p.play('Idle_Talking_Loop', 0.2);
+        p.mixers.forEach((m) => (m.timeScale = 1));
+      }
+    });
+    const ay = w.people['ayaba'];
+    if (ay) { saved.push({ p: ay, x: ay.root.position.x, z: ay.root.position.z, ry: ay.root.rotation.y, vis: true }); ay.root.position.set(0, -50, 0); }
+    // le chef sur son siège
+    const h = this.houngbo;
+    if (h) { h.root.position.set(-6.5, 0, 5.5); h.root.rotation.y = throneRy; h.root.visible = true; h.play('Sitting_Talking_Loop', 0.2); }
+    // Dah Agossou, en blanc, à l'écart, qui regarde les fûts
+    const agossou = buildPerson(this.models, { id: 'agossou', sex: 'm', height: 1.74, skin: '#3a2618', top: 'bomba', wax: ['#efe9dc', '#d8d0c0', '#c8bfae'],
+      pants: '#e8e2d4', beard: true, azevi: false, pose: 'Idle_Loop' });
+    if (agossou) {
+      agossou.root.position.set(13, 0, 7.5);
+      agossou.root.rotation.y = Math.atan2(25, -12.5);
+      this.scene.add(agossou.root);
+      const al = new THREE.PointLight(0xffb070, 8, 7, 1.5);
+      al.position.set(12, 2.4, 8.8);
+      this.scene.add(al);
+      props.push(al);
+    }
+    w.followGaze = false;
+    w.flameScale = [1.6, 1, 1];
+    this.fest = { props, fires, saved, dancers, agossou, lamp, barrels, runners: [] };
+  }
+
+  private filmScene(): void {
+    this.mode = 'cine';
+    const fest = this.fest!;
+    const h = this.houngbo;
+    const ag = fest.agossou;
+    const w = this.world;
+    const cam = this.camera;
+    const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+    const fired = new Set<string>();
+    const at = (k: string, t: number, now: number, f: () => void) => { if (now >= t && !fired.has(k)) { fired.add(k); f(); } };
+    const lerp = (a: THREE.Vector3, b: THREE.Vector3, u: number) => a.clone().lerp(b, THREE.MathUtils.smoothstep(u, 0, 1));
+    let shake = 0;
+    let lampFall = -1;
+    const lampFires: FireHandle[] = [];
+    let done = false;
+    this.director.fadeTo(0, 2);
+    this.director.title('TEN YEARS AGO', 'THE NIGHT OF THE FIRE', 5);
+    this.director.play({
+      duration: 33,
+      update: (t, dt) => {
+        h?.update(dt);
+        ag?.update(dt);
+        // ---- plan 1 : la fête, vue d'en haut, la caméra descend vers les danseurs
+        if (t < 7) {
+          cam.position.copy(lerp(V(15, 8, 25), V(7, 3.2, 17), t / 7));
+          cam.lookAt(0, 1.3, 9.4);
+        } else if (t < 12) {
+          // ---- plan 2 : le chef Houngbo sur son siège, une calebasse de sodabi à la main
+          cam.position.copy(lerp(V(-4.4, 1.25, 7.9), V(-5.0, 1.2, 7.2), (t - 7) / 5));
+          cam.lookAt(-6.5, 1.12, 5.5);
+        } else if (t < 17) {
+          // ---- plan 3 : Dah Agossou, à l'écart, regarde les fûts
+          cam.position.copy(lerp(V(11.2, 1.75, 9.8), V(11.7, 1.75, 9.1), (t - 12) / 5));
+          cam.lookAt(lerp(V(13, 1.55, 7.5), V(38, 2.5, -5), Math.max(0, (t - 14.5) / 2.5)));
+        } else if (t < 25.5) {
+          // ---- plan 4 : la lampe tempête accrochée en haut des fûts… le vent… elle tombe
+          cam.position.copy(lerp(V(36.0, 3.0, -3.0), V(36.8, 2.75, -3.9), (t - 17) / 8.5));
+          const lp = fest.lamp ? fest.lamp.position : V(38.1, 2.8, -5.55);
+          cam.lookAt(lp.x, Math.max(0.6, lp.y - 0.2), lp.z);
+        } else {
+          // ---- plan 5 : depuis la place, l'explosion
+          cam.position.copy(lerp(V(5, 1.4, 14.5), V(4.2, 1.3, 15.5), (t - 25.5) / 7.5));
+          cam.lookAt(36, 4 + Math.min(6, (t - 26) * 2), -5);
+        }
+        if (shake > 0) {
+          shake = Math.max(0, shake - dt);
+          cam.position.x += (Math.random() - 0.5) * shake * 0.5;
+          cam.position.y += (Math.random() - 0.5) * shake * 0.5;
+        }
+        at('party', 1.5, t, () => this.line('flash_party', 6));
+        at('chief', 7.6, t, () => { this.line('houngbo_feast', 5); this.audio.voiceMix('ha ha ha ha', 'm', { gain: 0.6, rate: 0.85 }); });
+        at('ag', 13, t, () => this.line('agossou_feast', 6));
+        // la lampe se balance… puis tombe sur la pile, rebondit et se brise au sol
+        if (fest.lamp && t > 17 && lampFall < 0) {
+          fest.lamp.rotation.z = Math.sin(t * 2.2) * 0.08 * Math.min(1, (t - 17) / 2);
+          if (fest.fires[0]) fest.fires[0].group.position.set(fest.lamp.position.x, fest.lamp.position.y + 0.21, fest.lamp.position.z);
+        }
+        at('fall', 21, t, () => { lampFall = 0; this.audio.sfx('swing', { gain: 0.4, rate: 0.6 }); });
+        if (fest.lamp && lampFall >= 0 && lampFall < 1) {
+          lampFall = Math.min(1, lampFall + dt / 0.9);
+          const u = lampFall;
+          fest.lamp.position.set(38.1 + u * 1.4, 2.79 * (1 - u * u) + 0.05, -5.55 + u * 1.2);
+          fest.lamp.rotation.z = u * 1.6;
+          if (fest.fires[0]) fest.fires[0].group.position.copy(fest.lamp.position).setY(fest.lamp.position.y + 0.15);
+          if (u >= 1) {
+            this.audio.sfx('impact', { gain: 0.9 });
+            this.audio.sfx('ember');
+            // le pétrole se répand : une traînée de feu court vers les fûts
+            for (let i = 0; i < 4; i++) setTimeout(() => {
+              const f = w.fx.add(new THREE.Vector3(39.4 - i * 0.45, 0.04, -4.3 - i * 0.25), 0.25 + i * 0.12, { smoke: true });
+              lampFires.push(f);
+              fest.fires.push(f);
+            }, 250 + i * 700);
+          }
+        }
+        // ---- l'explosion
+        at('boom', 26.2, t, () => {
+          w.fx.explode(new THREE.Vector3(38, 1.2, -5), 1.5);
+          this.audio.loop('festival', 0);
+          this.audio.sfx('explosion', { gain: 1.4 });
+          this.scareEl.classList.add('on');
+          setTimeout(() => this.scareEl.classList.remove('on'), 400);
+          shake = 1.4;
+          if (fest.barrels) fest.barrels.visible = false;
+          if (fest.lamp) fest.lamp.visible = false;
+          for (const f of lampFires) f.power = 0;
+          fest.fires.push(w.fx.add(new THREE.Vector3(38, 0, -5), 6, { smoke: true }));
+          w.flameScale[0] = 0.6;
+          this.audio.voiceMix('noooo help', 'f', { gain: 0.9, pan: 0.3 });
+          setTimeout(() => this.audio.voiceMix('fire fire run run', 'm', { gain: 0.9, pan: -0.4 }), 500);
+          setTimeout(() => this.audio.voiceMix('my children', 'f', { gain: 0.8, pan: 0.6 }), 1100);
+          // la panique : les danseurs s'enfuient
+          fest.dancers.forEach((p, i) => setTimeout(() => {
+            if (i % 4 === 3) p.play('Death01', 0.1, true);
+            else p.play('Sprint_Loop', 0.15);
+          }, 300 + i * 120));
+          if (h) h.play('Hit_Chest', 0.1, true);
+        });
+      },
+      end: () => {
+        if (done) return;
+        done = true;
+        if (fest.lamp) fest.lamp.visible = false;
+        if (fest.barrels) fest.barrels.visible = false;
+        if (!fired.has('boom')) { w.fx.explode(new THREE.Vector3(38, 1.2, -5), 1.5); fest.fires.push(w.fx.add(new THREE.Vector3(38, 0, -5), 6, { smoke: true })); }
+        this.startEscape();
+      },
+    });
+  }
+
+  // La fuite : on est Ayaba, le village brûle, il faut atteindre la lagune
+  private startEscape(): void {
+    const fest = this.fest!;
+    const w = this.world;
+    const fb = this.fb!;
+    fb.t = 0;
+    fb.ran = true;
+    this.mode = 'playing';
+    this.player.heightScale = 0.62;
+    this.player.place(1.8, 13.5, 0);
+    this.audio.loop('festival', 0);
+    this.audio.loop('fire', 0.9);
+    // le feu prend les cases, l'atelier, la buvette
+    for (const [x, z, s] of [[-8, -7, 2.6], [14, -11, 3], [-23, -6, 2.4], [20, 14, 2.8], [-12, 18, 2.4], [7, 21, 2.6], [24, -23, 3.2], [-27, -22, 3], [12, -33, 2.5],
+      [28, 4, 2.8], [31, 22, 2.6], [-33, 6, 2.2], [9, 4, 2.2], [-16, 4, 2.4], [17, -2, 1.6], [-3, -3, 1.2], [6, -14, 1.4], [-4.5, -15, 1.5], [5.5, -21, 2], [-9, -26, 1.8], [8, -28, 1.6], [-13, -12, 2.2]] as [number, number, number][]) {
+      fest.fires.push(w.fx.add(new THREE.Vector3(x, s > 2 ? 1.2 : 0, z), s, { smoke: true }));
+    }
+    // ceux qui courent : certains brûlent
+    fest.dancers.forEach((p, i) => {
+      if (i % 4 === 3) return;
+      const a = Math.random() * Math.PI * 2;
+      const dir = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
+      p.root.rotation.y = Math.atan2(dir.x, dir.z);
+      p.play('Sprint_Loop', 0.1);
+      const fire = i % 3 === 0 ? w.fx.add(p.root.position.clone(), 1.1, { smoke: true, light: false }) : null;
+      if (fire) { fire.follow = p.root; fest.fires.push(fire); }
+      fest.runners.push({ p, dir, t: 3 + Math.random() * 4, fire });
+    });
+    // Dah Agossou attend sur le chemin du nord et lui crie de courir
+    if (fest.agossou) { fest.agossou.root.position.set(1.2, 0, -9); fest.agossou.root.rotation.y = 0; fest.agossou.play('Interact', 0.2); }
+    if (this.houngbo) this.houngbo.root.visible = false;
+    fb.light.position.set(38, 8, -5);
+    this.scene.add(fb.light);
+    fb.light.intensity = 120;
+    this.hud.setTracker('MEMORY — AYABA', 'RUN TO THE LAGOON. North, past the iroko.', 'Shift — run');
+    this.director.fadeTo(0, 0.6);
   }
 
   private updateFlashback(dt: number): void {
     const fb = this.fb!;
+    const fest = this.fest;
+    if (!fb.ran || !fest) return;
     fb.t += dt;
     const pos = this.player.pos;
-    // l'explosion
-    if (fb.t > 9 && !fb.ran) {
-      fb.ran = true;
-      this.audio.loop('festival', 0);
-      this.audio.sfx('explosion', { gain: 1.3 });
-      this.shake = 0.9;
-      this.scareEl.classList.add('on');
-      setTimeout(() => this.scareEl.classList.remove('on'), 350);
-      fb.light.intensity = 260;
-      for (let i = 0; i < 6; i++) this.sparks.burst(new THREE.Vector3(34 + Math.random() * 8, 1 + Math.random() * 3, -9 + Math.random() * 6), 60);
-      this.audio.voiceMix('help us help', 'f', { ghost: true, gain: 0.9 });
-      setTimeout(() => this.audio.voiceMix('fire fire run', 'm', { ghost: true, gain: 0.8, pan: 0.6 }), 700);
-      setTimeout(() => this.line('agossou_flash', 4), 1800);
-      this.hud.setTracker('MEMORY', 'RUN TO THE LAGOON — north, past the iroko.', 'Shift — run');
+    fb.light.intensity = 90 * (0.8 + Math.random() * 0.4);
+    // les fuyards courent, puis tombent
+    for (const r of fest.runners) {
+      if (r.t <= 0) continue;
+      r.t -= dt;
+      r.p.root.position.addScaledVector(r.dir, 5 * dt);
+      if (r.t <= 0) { r.p.play('Death01', 0.1, true); if (r.fire) r.fire.power = 0.6; }
     }
-    if (fb.ran) {
-      fb.light.intensity = Math.max(70, fb.light.intensity - dt * 120) * (0.85 + Math.random() * 0.3);
-      // le feu court derrière elle : braises, chaleur, cœur qui bat
-      if (Math.random() < dt * 6) this.sparks.burst(pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 8, 0.5, 3 + Math.random() * 4)), 18);
-      this.audio.loop('heartbeat', 1);
-      this.player.stamina = Math.max(this.player.stamina, 35); // un enfant qui court pour sa vie
-      const tgt = new THREE.Vector3(0, 0, -44).project(this.camera);
-      this.hud.setMarker(tgt.z < 1 ? (tgt.x * 0.5 + 0.5) * innerWidth : null, (-tgt.y * 0.5 + 0.5) * innerHeight, 'The lagoon');
-      // trop lent : le feu la rattrape, le souvenir recommence
-      if (fb.t > 9 + 70) {
-        this.director.fadeTo(1, 0.6);
-        this.audio.sfx('stinger1');
-        fb.t = 2; fb.ran = false; fb.light.intensity = 0;
-        setTimeout(() => { this.player.place(2.2, 14, -1.25); this.audio.loop('festival', 0.6); this.director.fadeTo(0, 1); this.hud.say('The fire was faster. Again — run north, to the water.', 4); }, 700);
+    // braises et fumée autour d'elle ; des morceaux en feu tombent devant
+    if (Math.random() < dt * 5) w_embers(this.world, pos);
+    if (Math.random() < dt * 0.35) {
+      const f = this.player.forward(this.v1);
+      const p = pos.clone().addScaledVector(f, 5 + Math.random() * 4).add(new THREE.Vector3((Math.random() - 0.5) * 4, 0, (Math.random() - 0.5) * 2));
+      const h = this.world.fx.add(p, 0.9, { smoke: true });
+      fest.fires.push(h);
+      this.world.fx.burstEmbers(p.clone().setY(2.5), 40, 1.5, 2);
+      this.audio.sfx('impact', { gain: 0.7, pan: this.panOf(p) });
+    }
+    this.audio.loop('heartbeat', 1);
+    this.player.stamina = Math.max(this.player.stamina, 35); // une enfant qui court pour sa vie
+    const tgt = new THREE.Vector3(0, 0.5, -44).project(this.camera);
+    this.hud.setMarker(tgt.z < 1 ? (tgt.x * 0.5 + 0.5) * innerWidth : null, (-tgt.y * 0.5 + 0.5) * innerHeight, 'The lagoon');
+    // Dah Agossou lui crie de courir quand elle approche
+    const ag = fest.agossou;
+    if (ag) {
+      ag.update(dt);
+      if (!fb.done && ag.root.position.distanceTo(pos) < 10 && !hasFlag('fbShout')) {
+        setFlag('fbShout');
+        this.line('agossou_flash', 4);
+        ag.root.rotation.y = Math.atan2(pos.x - ag.root.position.x, pos.z - ag.root.position.z);
       }
-      if (pos.z < -41 && !fb.done) this.endFlashback();
     }
+    // trop lente : le feu la rattrape, la course recommence
+    if (fb.t > 75) {
+      fb.t = 0;
+      this.director.fadeTo(1, 0.5);
+      this.audio.sfx('stinger1');
+      setTimeout(() => { this.player.place(1.8, 13.5, 0); this.director.fadeTo(0, 0.8); this.hud.say('The fire was faster. Again — north, to the water.', 4); }, 600);
+    }
+    if (pos.z < -40.5 && !fb.done) this.waterScene();
+  }
+
+  // Sur la rive : elle se retourne. Dah Agossou repart dans le feu chercher les autres enfants. Elle tombe dans l'eau.
+  private waterScene(): void {
+    const fb = this.fb!;
+    const fest = this.fest!;
+    fb.done = true;
+    this.mode = 'cine';
+    this.hud.setMarker(null);
+    this.hud.setTracker(null);
+    const ag = fest.agossou;
+    const eye = new THREE.Vector3(this.player.pos.x, 1.0, this.player.pos.z);
+    if (ag) { ag.root.position.set(eye.x + 2.5, 0, eye.z + 7); ag.play('Walk_Loop', 0.2); ag.root.rotation.y = Math.atan2(10, 6); }
+    const under = document.createElement('div');
+    under.className = 'underwater';
+    document.body.appendChild(under);
+    const fired = new Set<string>();
+    const at = (k: string, t: number, now: number, f: () => void) => { if (now >= t && !fired.has(k)) { fired.add(k); f(); } };
+    let done = false;
+    this.director.play({
+      duration: 10,
+      update: (t, dt) => {
+        if (ag) { ag.update(dt); ag.root.position.x += Math.sin(ag.root.rotation.y) * 1.3 * dt; ag.root.position.z += Math.cos(ag.root.rotation.y) * 1.3 * dt; }
+        // elle se retourne vers le village en feu… puis bascule en arrière dans l'eau
+        const fall = Math.max(0, (t - 5.5) / 1.2);
+        this.camera.position.set(eye.x, eye.y - Math.min(1, fall) * 1.1, eye.z - Math.min(1, fall) * 0.8);
+        const look = new THREE.Vector3(eye.x + 2, 2 + Math.min(1, fall) * 9, eye.z + 20);
+        this.camera.lookAt(look);
+        at('see', 0.5, t, () => this.audio.voiceMix('grandpa', 'c', { gain: 0.7 }));
+        at('fall', 5.5, t, () => { this.audio.sfx('impact', { gain: 0.8, rate: 0.5 }); this.audio.muffle(true); under.classList.add('on'); this.audio.loop('heartbeat', 0.5); });
+        at('black', 8, t, () => this.director.fadeTo(1, 1.5));
+      },
+      end: () => {
+        if (done) return;
+        done = true;
+        under.remove();
+        this.audio.muffle(false);
+        this.director.fadeTo(1, 0);
+        this.endFlashback();
+      },
+    });
   }
 
   private endFlashback(): void {
     const fb = this.fb!;
-    fb.done = true;
-    this.director.fadeTo(1, 1);
+    const fest = this.fest;
+    const w = this.world;
     this.audio.loop('heartbeat', 0);
+    this.audio.loop('fire', 0);
     setTimeout(() => {
       this.scene.remove(fb.light);
+      if (fest) {
+        for (const o of fest.props) this.scene.remove(o);
+        for (const f of fest.fires) w.fx.remove(f);
+        for (const s of fest.saved) {
+          s.p.root.position.set(s.x, 0, s.z);
+          s.p.root.rotation.y = s.ry;
+          s.p.root.visible = s.vis;
+          s.p.mixers.forEach((m) => (m.timeScale = 1));
+          s.p.play(s.p.def.pose ?? 'Idle_Loop', 0.1);
+        }
+        if (fest.agossou) this.scene.remove(fest.agossou.root);
+      }
+      if (this.houngbo) this.houngbo.root.visible = false;
+      this.fest = null;
+      w.followGaze = true;
       this.renderer.domElement.classList.remove('flashback');
+      this.renderer.toneMappingExposure = this.exposure;
       this.player.heightScale = 1;
       this.player.place(fb.back[0], fb.back[1], fb.back[2]);
-      this.viewmodel.equip(fb.weapon as Parameters<Viewmodel["equip"]>[0]);
-      this.world.flameScale = [0.22, 0, 0];
+      this.viewmodel.equip(fb.weapon as Parameters<Viewmodel['equip']>[0]);
+      w.flameScale = [0.22, 0, 0];
       for (const e of this.enemies.list) e.person.root.visible = true;
       this.hud.setMarker(null);
       this.fb = null;
-      this.director.fadeTo(0, 2);
+      this.mode = 'playing';
+      this.director.fadeTo(0, 2.5);
       this.line('ayaba_flash_end', 9);
       this.advance(20);
       this.save();
-    }, 1100);
+    }, 900);
   }
 
   // ---------------------------------------------------------------- Fin de l'Acte II : le chef Houngbo, minuit
@@ -1081,7 +1505,7 @@ export class Game {
     const faceLight = new THREE.PointLight(0xff8a3a, 7, 6, 1.6);
     faceLight.position.set(at.x - f.x * 1.2, 0.6, at.z - f.z * 1.2);
     this.scene.add(faceLight);
-    const eye = this.camera.position.clone();
+    const eye = this.camera.position.clone().setY(2.25).addScaledVector(f, 0.4); // un peu au-dessus : rien ne cache le chef
     const head = new THREE.Vector3(at.x, 1.72, at.z);
     const fired = new Set<string>();
     const once = (k: string, t: number, now: number, fn: () => void) => { if (now >= t && !fired.has(k)) { fired.add(k); fn(); } };
@@ -1327,6 +1751,7 @@ export class Game {
         this.audio.sfx('kaolin');
         this.kaolinFx.burst(this.camera.position.clone().addScaledVector(dir, 0.6).setY(1.3), 70, dir);
         const n = this.enemies.repel(this.player.pos, dir, 6, 40);
+        this.kaolinStatues(dir);
         if (this.grab && n) { this.grab = null; this.hud.setGrabbed(false); }
         if (n) this.audio.voiceMix('aaah', 'm', { ghost: true, gain: 0.7, rate: 0.7 });
       }
