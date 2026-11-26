@@ -435,6 +435,15 @@ export class Game {
   }
 
   // Un choix à deux touches (E / R)
+  // Kossi explique le rite : début de l'Acte III — Le guérisseur
+  private tellRite(): void {
+    setFlag('repaired');
+    setFlag('riteTold');
+    this.line('kossi_rite_explain', 12);
+    this.advance(10);
+    this.setObjective('ACT III — The healer. Gather the 3 plants, find the whole truth (5 fragments), then begin the rite at the asen under the station.');
+  }
+
   private ask(a: string, onA: () => void, b: string, onB: () => void): void {
     this.choice = { a, onA, b, onB };
   }
@@ -470,10 +479,11 @@ export class Game {
       },
       {
         pos: p.car, range: 3.4,
-        label: () => (hasFlag('repaired') ? 'Drive away' : null),
+        label: () => (hasFlag('repaired') ? (hasFlag('riteTold') ? 'Your 4×4 is ready' : 'Drive away') : null),
         use: () => {
           if (!hasFlag('riteTold') && !hasFlag('carDoubt')) { setFlag('carDoubt'); this.line('happy_car_doubt', 5); }
-          this.ask('Drive away and leave Azé-tin behind', () => this.ending(), 'Not yet', () => this.line('happy_notyet', 3));
+          // E = rester (on ne part jamais par erreur en appuyant deux fois), R = partir
+          this.ask('Not yet', () => this.line('happy_notyet', 3), 'Drive away and leave Azé-tin behind', () => this.ending());
         },
       },
       {
@@ -542,21 +552,20 @@ export class Game {
               this.kossiAsking = true;
               this.line('kossi_ask', 8);
               setTimeout(() => (this.kossiAsking = false), 7200);
-              setTimeout(() => this.ask('Just fix my car. I’m leaving.', () => {
+              // E = la voie normale (le rite), R = partir
+              setTimeout(() => this.ask('Tell me how to save Azé-tin.', () => this.tellRite(), 'Just fix my car. I’m leaving.', () => {
                 setFlag('repaired');
                 this.line('kossi_leave_ok', 5);
-                this.advance(30);
-                this.setObjective('Your 4×4 is fixed. Drive away before dawn… if you can live with it.');
-              }, 'Tell me how to save Azé-tin.', () => {
-                setFlag('repaired');
-                setFlag('riteTold');
-                this.line('kossi_rite_explain', 12);
                 this.advance(20);
-                this.setObjective('The rite: the calabash, the 3 plants, the 5 fragments — then the asen under the station ruins. Your car is ready if you change your mind.');
+                this.setObjective('Your 4×4 is fixed. Drive away before dawn… if you can live with it.');
               }), 7000);
             }
           } else {
-            if (hasFlag('repaired')) this.line('kossi_why', 4);
+            if (hasFlag('repaired') && !hasFlag('riteTold')) {
+              // il n'est pas trop tard pour changer d'avis
+              this.line('kossi_why', 4);
+              setTimeout(() => this.ask('Tell me how to save Azé-tin.', () => this.tellRite(), 'Nothing. Goodbye.', () => {}), 4200);
+            } else if (hasFlag('repaired')) this.line('kossi_why', 4);
             else if (story.pieces >= 1 && !hasFlag('kossiStory')) {
               setFlag('kossiStory');
               this.line('kossi_story', 14); // l'histoire du feu, racontée à voix basse
@@ -932,7 +941,7 @@ export class Game {
     }
     if (!hasFlag('act1')) { for (const st of this.statues) st.p.root.visible = false; return; }
     this.updateStatues(dt);
-    if (!hasFlag('act2') && this.time > this.nextHornbill) {
+    if ((!hasFlag('act2') || hasFlag('riteTold')) && this.time > this.nextHornbill) {
       this.nextHornbill = this.time + 40 + Math.random() * 25;
       const t = this.target();
       const left = this.pickups.find((p) => p.obj.visible);
@@ -1650,7 +1659,7 @@ export class Game {
     if (this.rite) { this.updateRite(dt); return; }
     // l'horloge avance vers l'aube (sauf pendant le rite)
     const before = story.minutes;
-    story.minutes += dt * 0.5;
+    story.minutes += dt * 0.35; // ≈ 14 min de jeu entre minuit et l'aube
     if (before < 28 * 60 + 30 && story.minutes >= 28 * 60 + 30) this.hud.objective('4:30 — Dawn is coming. Half an hour left.');
     if (story.minutes >= 29 * 60 && this.mode === 'playing') { this.line('happy_dawn', 4); this.ending(true); return; }
     // les Brûlés se lèvent un à un et viennent chercher Happy
@@ -2604,6 +2613,16 @@ export class Game {
     }
   }
 
+  // Les trois actes, bien séparés : Acte I (la panne), Acte II (la vérité), Acte III (le guérisseur… ou la fuite)
+  private actLabel(index: number): string {
+    const a2 = STEPS.findIndex((x) => x.id === 'stump');
+    const a3 = STEPS.findIndex((x) => x.id === 'repair');
+    if (index < a2) return `ACT I — The breakdown · ${index + 1}/${a2}`;
+    if (index < a3) return `ACT II — The truth · ${index - a2 + 1}/${a3 - a2}`;
+    if (hasFlag('repaired') && !hasFlag('riteTold')) return 'ACT III — The road';
+    return `ACT III — The healer · ${index - a3 + 1}/4`;
+  }
+
   // Repères : étape en cours (haut gauche), marqueur à l'écran, nom des lieux, découvertes pour la carte
   private guide(): void {
     const { step, index } = currentStep();
@@ -2612,7 +2631,7 @@ export class Game {
       this.lastStep = index;
     }
     const dead = story.battery <= 5 && hasFlag('trunk');
-    this.hud.setTracker(dead ? 'Phone almost dead' : `Step ${index + 1} / ${STEPS.length}`, dead ? 'Go back to your 4\u00d74 to charge your phone (follow the orange hazard lights).' : step.text,
+    this.hud.setTracker(dead ? 'Phone almost dead' : this.actLabel(index), dead ? 'Go back to your 4\u00d74 to charge your phone (follow the orange hazard lights).' : step.text,
       'Tab phone \u00b7 M map \u00b7 F torch \u00b7 Right click mirror');
 
     // lieux : nom à l'arrivée, découverte pour la carte

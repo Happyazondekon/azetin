@@ -76,10 +76,45 @@ export const STEPS: Step[] = [
   { id: 'ashes', text: 'Search the old fuel station for the truth', hint: 'Three fragments lie in the ruins, east. Q throws kaolin if they come.', target: () => stationFragment(), done: () => STATION.every((f) => hasFlag('frag_' + f.id)) },
   { id: 'power', text: 'Take the generator battery at the station', hint: 'The generator stands at the west corner of the ruins.', target: () => ({ x: 34.5, z: -0.6 }), done: () => hasFlag('power') },
   { id: 'midnight', text: 'Midnight is coming…', hint: 'Someone in this village wants to meet you.', target: () => null, done: () => hasFlag('act2') },
-  // ---- Acte III (prototype : la réparation, puis le choix)
+  // ---- Acte III — Le guérisseur (après la question de Kossi, à minuit)
   { id: 'repair', text: 'Midnight: go back to Kossi', hint: 'His workshop, west of the square. He has a question for you.', target: at('atelier'), done: () => hasFlag('repaired') },
-  { id: 'leave', text: 'Before dawn, choose: drive away · burn the healer’s house for Houngbo · or the rite', hint: 'The rite needs the 3 plants and the whole truth (5 fragments), at the asen under the station ruins.', target: () => (story.plantes >= 3 && story.secret >= 5 ? { x: 38.6, z: -5 } : hasFlag('repaired') ? { x: 1.2, z: 68 } : { x: -16, z: 5 }), done: () => false },
+  // chemin du rite (si Happy a demandé comment sauver Azé-tin)
+  {
+    id: 'plants',
+    get text() { return `Gather the healer’s 3 plants (${story.plantes}/3)`; },
+    get hint() { return nextPlant()?.hint ?? ''; },
+    target: () => nextPlant(),
+    done: () => !hasFlag('riteTold') || story.plantes >= 3,
+  },
+  {
+    id: 'truth',
+    get text() { return `Find the whole truth: the last fragments (${story.secret}/5)`; },
+    get hint() { return nextFragment()?.hint ?? ''; },
+    target: () => nextFragment(),
+    done: () => !hasFlag('riteTold') || story.secret >= 5,
+  },
+  { id: 'rite', text: 'Begin the rite at the asen, under the station ruins', hint: 'Press E at the asen. Kaolin (Q) holds them back, refill at the asen (E). Then chant every verse.', target: () => ({ x: 38.6, z: -2.8 }), done: () => !hasFlag('riteTold') },
+  // chemin de la fuite (Happy a seulement voulu sa voiture)
+  { id: 'leave', text: 'Your 4×4 is fixed. Drive away before dawn', hint: 'Changed your mind? Kossi can still tell you how to save Azé-tin.', target: () => ({ x: 1.2, z: 68 }), done: () => false },
 ];
+
+// Act III : la prochaine plante / le prochain fragment à trouver (le repère et le calao y mènent)
+const PLANTS = [
+  { id: 'flower', x: 0.3, z: -19.0, hint: 'Hornbill flower: on top of the stump of the sacred iroko (north of the square).' },
+  { id: 'ash', x: 36.2, z: -11.6, hint: 'Ash grass: in the ashes behind the old fuel station (east).' },
+  { id: 'liana', x: -16.8, z: -41.2, hint: 'Moon liana: on the hut by the lagoon (far north, west of the healer’s house).' },
+];
+const FRAGMENTS = [
+  { id: 'drawing', x: -2.4, z: 33.3, hint: 'A child’s drawing: at the foot of the stone of the dead (on the road from your car).' },
+  { id: 'notebook', x: -26.2, z: -18.4, hint: 'The chief’s debt book: in front of Chief Houngbo’s house (north-west).' },
+  ...STATION.map((f) => ({ ...f, hint: 'In the ruins of the old fuel station (east).' })),
+];
+function nextPlant(): { x: number; z: number; hint: string } | null {
+  return PLANTS.find((p) => !hasFlag('plant_' + p.id)) ?? null;
+}
+function nextFragment(): { x: number; z: number; hint: string } | null {
+  return FRAGMENTS.find((f) => !hasFlag('frag_' + f.id)) ?? null;
+}
 
 export function currentStep(): { step: Step; index: number } {
   const i = STEPS.findIndex((s) => !s.done());
