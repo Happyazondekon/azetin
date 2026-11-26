@@ -98,9 +98,20 @@ function smokeTexture(): THREE.Texture {
 
 interface Particle { pos: THREE.Vector3; vel: THREE.Vector3; life: number; max: number; size: number; spin: number }
 
+/** Une lumière « virtuelle » : le système ne garde qu'un petit nombre de vraies lumières
+ *  (toujours le même, donc jamais de recompilation de shaders) et les donne aux plus importantes. */
+export interface Glow {
+  pos: THREE.Vector3;
+  color: THREE.Color;
+  intensity: number;
+  distance: number;
+  follow?: THREE.Object3D;
+  offset?: THREE.Vector3;
+}
+
 export interface FireHandle {
   group: THREE.Group;
-  light: THREE.PointLight | null;
+  light: Glow | null;
   power: number;          // 0 à 1 (on peut l'allumer, l'éteindre, le faire grandir)
   size: number;
   smoke: boolean;
@@ -112,6 +123,7 @@ export class FireSystem {
   private fires: FireHandle[] = [];
   private mats: THREE.ShaderMaterial[] = [];
   private t = 0;
+  private tmp = new THREE.Vector3();
   // braises : un seul nuage de points pour tout le village
   private emberGeo = new THREE.BufferGeometry();
   private emberPos: Float32Array;
@@ -124,8 +136,18 @@ export class FireSystem {
   private smokeNext = 0;
   private smokeTex = smokeTexture();
   private explosions: Explosion[] = [];
+  private glows: Glow[] = [];
+  private pool: THREE.PointLight[] = [];
+  readonly boom: THREE.PointLight;   // la lumière des explosions (une seule à la fois)
 
   constructor(private scene: THREE.Scene) {
+    for (let i = 0; i < 8; i++) {
+      const l = new THREE.PointLight(0xff7a2a, 0, 10, 1.6);
+      scene.add(l);
+      this.pool.push(l);
+    }
+    this.boom = new THREE.PointLight(0xff9a40, 0, 90, 1.5);
+    scene.add(this.boom);
     this.emberPos = new Float32Array(this.EN * 3).fill(-99);
     this.emberVel = new Float32Array(this.EN * 3);
     this.emberLife = new Float32Array(this.EN);
@@ -136,7 +158,7 @@ export class FireSystem {
     pts.frustumCulled = false;
     pts.layers.enableAll();
     scene.add(pts);
-    for (let i = 0; i < 120; i++) {
+    for (let i = 0; i < 80; i++) {
       const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.smokeTex, color: 0x2a2420, transparent: true, depthWrite: false, opacity: 0 }));
       s.layers.enableAll();
       s.visible = false;
@@ -162,18 +184,30 @@ export class FireSystem {
       group.add(q);
     }
     this.scene.add(group);
-    let light: THREE.PointLight | null = null;
+    let light: Glow | null = null;
     if (opts.light !== false) {
-      light = new THREE.PointLight(opts.color ?? 0xff7a2a, 0, Math.max(6, size * 8), 1.6);
-      light.position.set(0, size * 0.6, 0);
-      group.add(light);
+      light = this.addGlow(at.clone().setY(at.y + size * 0.6), opts.color ?? 0xff7a2a, 0, Math.max(6, size * 8));
+      light.follow = group;
+      light.offset = new THREE.Vector3(0, size * 0.6, 0);
     }
     const f: FireHandle = { group, light, power: opts.power ?? 1, size, smoke: opts.smoke ?? size > 0.8, embers: opts.embers ?? true };
     this.fires.push(f);
     return f;
   }
 
+  /** une lueur (lampe, case, visage éclairé…) */
+  addGlow(pos: THREE.Vector3, color: number, intensity: number, distance: number): Glow {
+    const g: Glow = { pos: pos.clone(), color: new THREE.Color(color), intensity, distance };
+    this.glows.push(g);
+    return g;
+  }
+
+  removeGlow(g: Glow | null): void {
+    if (g) this.glows = this.glows.filter((x) => x !== g);
+  }
+
   remove(f: FireHandle): void {
+    this.removeGlow(f.light);
     this.scene.remove(f.group);
     this.fires = this.fires.filter((x) => x !== f);
   }
@@ -227,6 +261,24 @@ export class FireSystem {
       if (f.embers && Math.random() < dt * 6 * f.size * f.power) this.emitEmber(f.group.position.clone().setY(f.group.position.y + f.size * 0.5), f.size * 0.6, 1 + f.size * 0.6);
       if (f.smoke && Math.random() < dt * 2.2 * f.power) this.emitSmoke(f.group.position.clone().setY(f.group.position.y + f.size * 0.9), f.size * 1.4, 0.8 + f.size * 0.3);
     }
+    // les vraies lumières vont aux lueurs les plus fortes et les plus proches
+    const ranked: { g: Glow; score: number }[] = [];
+    for (const g of this.glows) {
+      if (g.follow) { g.pos.copy(g.follow.getWorldPosition(this.tmp)); if (g.offset) g.pos.add(g.offset); if (!g.follow.visible) continue; }
+      if (g.intensity <= 0.01) continue;
+      const d2 = g.pos.distanceToSquared(camPos);
+      if (d2 > (g.distance + 45) ** 2) continue;
+      ranked.push({ g, score: g.intensity * g.distance / (1 + d2 * 0.02) });
+    }
+    ranked.sort((a, b) => b.score - a.score);
+    this.pool.forEach((l, i) => {
+      const r = ranked[i];
+      if (!r) { l.intensity = 0; return; }
+      l.position.copy(r.g.pos);
+      l.color.copy(r.g.color);
+      l.intensity = r.g.intensity;
+      l.distance = r.g.distance;
+    });
     // braises
     for (let i = 0; i < this.EN; i++) {
       if (this.emberLife[i] <= 0) continue;
@@ -318,9 +370,8 @@ class Explosion {
     this.ring.position.set(at.x, 0.15, at.z);
     this.ring.layers.enableAll();
     scene.add(this.ring);
-    this.light = new THREE.PointLight(0xff9a40, 380 * s, 90, 1.5);
+    this.light = fx.boom;
     this.light.position.set(at.x, at.y + 4, at.z);
-    scene.add(this.light);
     // débris : planches, tôles et fûts projetés
     const dmat = new THREE.MeshStandardMaterial({ color: 0x1a120c, emissive: 0xff5a10, emissiveIntensity: 0.6, roughness: 1 });
     for (let i = 0; i < 26; i++) {
@@ -362,7 +413,8 @@ class Explosion {
       this.fx.emitSmoke(p, 3 * s + Math.random() * 3 * s, 2.5 * s, 9, t < 3 ? 0x4a2a18 : 0x1c1410);
     }
     if (t > 12) {
-      this.scene.remove(this.ball, this.ring, this.light);
+      this.scene.remove(this.ball, this.ring);
+      this.light.intensity = 0;
       this.done = true;
     }
   }

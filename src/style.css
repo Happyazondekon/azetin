@@ -288,12 +288,12 @@ canvas.flashback { filter: saturate(0.6) sepia(0.35) contrast(1.15); }
 .whiteout { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 18; transition: opacity 0.3s; }
 .whiteout.on { opacity: 1; transition: opacity 0.08s; }
 
-/* icônes rendues dans Blender */
-.ph-ico { background: none !important; box-shadow: none !important; width: 60px; height: 60px; }
-.ph-ico img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.5)); }
-.ph-w small .ph-ico { width: 18px; height: 18px; }
-.ph-banner i img { width: 100%; height: 100%; object-fit: contain; }
-.ph-play { background: #2c2c2e url(ui/icon-memos.png) center/80% no-repeat !important; }
+/* icônes du téléphone : modernes ; l'app du jeu porte le logo */
+.ph-ico svg { width: 64%; height: 64%; }
+.ph-logo { background: none !important; box-shadow: none !important; overflow: hidden; }
+.ph-logo img { width: 100%; height: 100%; border-radius: 15px; }
+.ph-w small .ph-ico { width: 16px; height: 16px; border-radius: 4px; }
+.ph-banner svg { width: 66%; height: 66%; }
 .kaolin img { width: 20px; height: 20px; margin-right: 3px; vertical-align: middle; } .kaolin img.off { opacity: 0.18; filter: grayscale(1); }
 .marker img { display: block; width: 22px; height: 22px; margin: 0 auto 2px; filter: drop-shadow(0 0 8px rgba(255,90,20,0.8)); animation: emberpulse 1.2s ease-in-out infinite alternate; }
 @keyframes emberpulse { from { transform: scale(0.9); } to { transform: scale(1.1); } }
@@ -304,3 +304,7 @@ canvas.flashback { filter: saturate(0.6) sepia(0.35) contrast(1.15); }
 /* le générique de fin */
 .credits { position: fixed; inset: 0; z-index: 45; background: #000; transition: opacity 0.9s; cursor: pointer; }
 .credits.out { opacity: 0; }
+
+/* le logo (braises) au menu */
+.menu-logo { display: block; width: min(560px, 46vw); height: auto; margin-left: -14px; filter: drop-shadow(0 0 22px rgba(255,80,0,0.25)); animation: logoflicker 4s infinite; }
+@keyframes logoflicker { 0%, 100% { opacity: 1; } 47% { opacity: 1; } 48% { opacity: 0.82; } 49% { opacity: 1; } 73% { opacity: 0.9; } 74% { opacity: 1; } }

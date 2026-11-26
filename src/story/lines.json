@@ -307,5 +307,25 @@
   "happy_dawn": {
     "who": "happy",
     "text": "The sky is turning grey... Dawn. I'm out of time."
+  },
+  "kossi_wait": {
+    "who": "kossi",
+    "text": "The battery is good. But my compressor is old, it must cool down... Come back at midnight. And use the time. The night has things to show you."
+  },
+  "kossi_ask": {
+    "who": "kossi",
+    "text": "Your car is ready. You can leave now... But tell me, traveller. Do you really not want to save Azé-tin?"
+  },
+  "kossi_leave_ok": {
+    "who": "kossi",
+    "text": "Then go. Don't stop on the road. And don't look in your mirror."
+  },
+  "kossi_rite_explain": {
+    "who": "kossi",
+    "text": "Then listen. The healer's calabash, the three plants, and the whole truth. Bring them to the asen under the station, and sing. Houngbo will come. Whatever happens... don't stop singing."
+  },
+  "happy_car_doubt": {
+    "who": "happy",
+    "text": "If I leave now... they stay here. All of them. Forever."
   }
 }

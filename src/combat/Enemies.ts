@@ -75,7 +75,7 @@ export class Enemies {
       e.hits += 1;
       e.person.play('Hit_Chest', 0.1, true);
     } else {
-      this.events.onHitPlayer(34, e);
+      this.events.onHitPlayer(28, e);
       e.state = 'stagger';
       e.timer = 0.6;
     }
@@ -90,8 +90,8 @@ export class Enemies {
       const d = this.tmp.copy(e.pos).sub(from);
       d.y = 0;
       const dist = d.length();
-      if (dist > range || dist < 0.01) continue;
-      if ((d.x * dir.x + d.z * dir.z) / dist < 0.5) continue;
+      if (dist > range + 0.3 || dist < 0.01) continue;
+      if ((d.x * dir.x + d.z * dir.z) / dist < 0.35) continue;
       if (e.state === 'grab') continue;
       touched.push(e.pos.clone().setY(1.3));
       e.hits += power;
@@ -161,25 +161,29 @@ export class Enemies {
           this.move(e, to, dist, 1.25);
           if (dist < 9) { e.state = 'chase'; e.person.play('Sprint_Loop'); }
           break;
-        case 'chase':
-          this.move(e, to, dist, 4.0);
+        case 'chase': {
+          // pas plus de deux à la fois sur Happy : les autres tournent autour, à distance
+          const busy = this.list.filter((x) => x !== e && (x.state === 'windup' || x.state === 'grab')).length >= 2;
+          if (busy && dist < 3) { this.move(e, to.clone().set(-to.z, 0, to.x), dist, 1.4); break; }
+          this.move(e, to, dist, 3.5);
           if (dist < 1.7 && e.cooldown <= 0) {
             // élan : il lève les bras, on l'entend
             e.state = 'windup';
-            e.timer = 0.5;
+            e.timer = 0.65;
             e.person.play('Interact', 0.08, true);
             this.events.onWindup(e);
           }
           break;
+        }
         case 'windup':
           this.face(e, to);
           if (dist > 1.0) this.move(e, to, dist, 2.2); // il se jette sur Happy
           e.timer -= dt;
           if (e.timer <= 0) {
-            e.cooldown = 1.2;
+            e.cooldown = 1.5;
             if (dist < 1.9) {
-              if (Math.random() < 0.3) { e.state = 'grab'; e.timer = 2.2; this.events.onGrab(e); break; }
-              this.events.onHitPlayer(20, e);
+              if (Math.random() < 0.22 && !this.list.some((x) => x.state === 'grab')) { e.state = 'grab'; e.timer = 2.2; this.events.onGrab(e); break; }
+              this.events.onHitPlayer(16, e);
             }
             e.state = 'chase';
             e.person.play('Sprint_Loop');

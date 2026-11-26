@@ -16,9 +16,9 @@ import type { Enemy } from '../combat/Enemies';
 import { PLACES, STEPS, currentStep, setAyabaPos } from '../story/Places';
 import { Director } from '../story/Director';
 import { buildAct2Props, type Pickup } from '../world/Act2Props';
-import type { FireHandle } from '../world/Fire';
+import type { FireHandle, Glow } from '../world/Fire';
 import { instance, type ModelName, type Models } from '../world/Assets';
-import { markEnding } from '../ui/Endings';
+import { markEnding, endingsSeen } from '../ui/Endings';
 import { Credits } from '../ui/Credits';
 import { LAYER_SEEN, LAYER_TRUTH } from '../world/Village';
 import LINES from '../story/lines.json';
@@ -82,6 +82,7 @@ export class Game {
   private scareEl!: HTMLDivElement;
   private blackout = 0;                       // la torche se coupe une fraction de seconde
   private dossiLaughT = 0;
+  private kossiAsking = false;
   // ---- Acte II
   private pickups: Pickup[] = [];
   private hornbill!: THREE.Object3D;
@@ -90,10 +91,10 @@ export class Game {
   private kaolinCd = 0;
   private nextHornbill = 0;
   private act2Pending = false;
-  private fb: { t: number; ran: boolean; back: [number, number, number]; weapon: string | null; light: THREE.PointLight; done: boolean } | null = null;
+  private fb: { t: number; ran: boolean; back: [number, number, number]; weapon: string | null; light: Glow; done: boolean } | null = null;
   private camFlashEl!: HTMLDivElement;
   // les gens de cendre de la station : ils avancent quand on ne les regarde pas
-  private statues: { p: Person; home: THREE.Vector3; lastSeen: THREE.Vector3; cd: number; seen: boolean }[] = [];
+  private statues: { p: Person; home: THREE.Vector3; lastSeen: THREE.Vector3; cd: number; seen: boolean; hits?: number }[] = [];
   private statueScareT = 0;
   private exposure = 1.6;
   private lastStep = -1;
@@ -168,7 +169,7 @@ export class Game {
       onMarker: (on) => (this.markerOn = on),
       where: () => ({ x: this.player.pos.x, z: this.player.pos.z, yaw: this.player.yaw, target: this.target() }),
     });
-    this.menu = new Menu(root, { onNew: () => this.start(false), onContinue: () => this.start(true) }, hasSave());
+    this.menu = new Menu(root, { onNew: () => this.start(false), onContinue: () => this.start(true), onCredits: () => void this.menuCredits() }, hasSave());
     this.menu.setLoading('Searching for network… 0%');
 
     addEventListener('resize', () => this.resize());
@@ -191,7 +192,7 @@ export class Game {
     this.models = models;
     this.world = buildVillage(this.scene, models);
     this.buildFigure();
-    const a2 = buildAct2Props(this.scene);
+    const a2 = buildAct2Props(this.scene, this.world.fx);
     this.pickups = a2.pickups;
     this.hornbill = a2.hornbill;
     this.kaolinFx = new Sparks(this.scene, 'kaolin');
@@ -221,6 +222,8 @@ export class Game {
     if (ay) setAyabaPos(() => ({ x: ay.root.position.x, z: ay.root.position.z }));
     this.interactables = this.buildInteractables();
     this.ready = true;
+    // compile les shaders tout de suite (pas de saccade la première fois qu'on voit un feu ou un personnage)
+    try { this.renderer.compile(this.scene, this.camera); } catch { /* pas grave */ }
     this.menu.setLoading(null);
     this.renderer.setAnimationLoop(() => this.frame());
   }
@@ -463,7 +466,10 @@ export class Game {
       {
         pos: p.car, range: 3.4,
         label: () => (hasFlag('repaired') ? 'Drive away' : null),
-        use: () => this.ask('Drive away before dawn', () => this.ending(), 'Not yet', () => this.line('happy_notyet', 3)),
+        use: () => {
+          if (!hasFlag('riteTold') && !hasFlag('carDoubt')) { setFlag('carDoubt'); this.line('happy_car_doubt', 5); }
+          this.ask('Drive away and leave Azé-tin behind', () => this.ending(), 'Not yet', () => this.line('happy_notyet', 3));
+        },
       },
       {
         pos: p.stele, range: 2.0,
@@ -520,10 +526,30 @@ export class Game {
             this.advance(30);
             this.setObjective('Act II — Bring power from the old fuel station (east of the village).');
           } else if (story.pieces >= 3 && !hasFlag('repaired')) {
-            setFlag('repaired');
-            this.line(hasFlag('act2') ? 'kossi_after' : 'kossi_repaired', 8);
-            this.advance(40);
-            this.setObjective('Your 4×4 is fixed. Leave before dawn — or find out what happened to Azé-tin.');
+            if (!hasFlag('act2')) {
+              // avant minuit, Kossi garde la batterie : on ne quitte pas Azé-tin sans avoir vu ce que la nuit cache
+              setFlag('batteryGiven');
+              this.line('kossi_wait', 9);
+              this.setObjective('Kossi will fix the car at midnight. Until then, follow the hornbill — learn what happened to Azé-tin.');
+            } else {
+              // à minuit : la voiture est prête… mais Kossi pose LA question
+              if (this.kossiAsking || this.choice) return;
+              this.kossiAsking = true;
+              this.line('kossi_ask', 8);
+              setTimeout(() => (this.kossiAsking = false), 7200);
+              setTimeout(() => this.ask('Just fix my car. I’m leaving.', () => {
+                setFlag('repaired');
+                this.line('kossi_leave_ok', 5);
+                this.advance(30);
+                this.setObjective('Your 4×4 is fixed. Drive away before dawn… if you can live with it.');
+              }, 'Tell me how to save Azé-tin.', () => {
+                setFlag('repaired');
+                setFlag('riteTold');
+                this.line('kossi_rite_explain', 12);
+                this.advance(20);
+                this.setObjective('The rite: the calabash, the 3 plants, the 5 fragments — then the asen under the station ruins. Your car is ready if you change your mind.');
+              }), 7000);
+            }
           } else {
             if (hasFlag('repaired')) this.line('kossi_why', 4);
             else if (story.pieces >= 1 && !hasFlag('kossiStory')) {
@@ -612,7 +638,7 @@ export class Game {
           : this.rite ? (this.rite.phase < 3 && this.rite.refillCd <= 0 && story.kaolin < 5 ? 'Take kaolin from the asen' : null)
             : 'Begin the rite at the asen'),
         use: () => {
-          if (this.rite) { story.kaolin = 5; this.rite.refillCd = 12; this.audio.sfx('kaolin', { gain: 0.5 }); return; }
+          if (this.rite) { story.kaolin = 5; this.rite.refillCd = 8; this.audio.sfx('kaolin', { gain: 0.5 }); return; }
           this.startRite();
         },
       },
@@ -890,7 +916,8 @@ export class Game {
     // les objets de l'Acte II n'apparaissent qu'après l'Acte I, et disparaissent une fois ramassés (aussi après un chargement)
     for (const pk of this.pickups) {
       const taken = hasFlag(pk.kind === 'fragment' ? 'frag_' + pk.id : pk.kind === 'plant' ? 'plant_' + pk.id : 'calabash');
-      pk.obj.visible = pk.glow.visible = hasFlag('act1') && !taken;
+      pk.obj.visible = hasFlag('act1') && !taken;
+      pk.glow.intensity = pk.obj.visible ? 1.4 : 0;
     }
     if (hasFlag('agossou') && !this.hornbill.visible && this.mode === 'playing') {
       this.spiritLight();
@@ -989,6 +1016,33 @@ export class Game {
     }
   }
 
+  // On peut les frapper : le coup les fait éclater en cendre ; ils reculent et se reforment plus loin
+  private strikeStatues(dir: THREE.Vector3, range: number, power: number): void {
+    for (const st of this.statues) {
+      if (!st.p.root.visible) continue;
+      const d = st.p.root.position.clone().sub(this.player.pos).setY(0);
+      const dist = d.length();
+      if (dist > range + 0.5 || dist < 0.01 || d.normalize().dot(dir) < 0.35) continue;
+      const at = st.p.root.position.clone().setY(1.1);
+      this.sparks.burst(at, 40 + 15 * power);
+      this.world.fx.burstEmbers(at, 50, 0.6, 1.6);
+      this.world.fx.emitSmoke(at, 1.6, 0.5, 3, 0x1a1612);
+      this.audio.thud();
+      this.audio.sfx('ember', { gain: 0.9, pan: this.panOf(at) });
+      this.shake = Math.max(this.shake, 0.15);
+      // il recule, figé un moment ; au troisième coup il retombe en poussière et retourne là où le feu l'a pris
+      st.hits = (st.hits ?? 0) + power;
+      st.cd = 4 + 2 * power;
+      if (st.hits >= 3) {
+        st.hits = 0;
+        st.cd = 14;
+        this.world.fx.emitSmoke(at, 2.6, 0.8, 4, 0x1a1612);
+        st.p.root.position.copy(st.home);
+      } else st.p.root.position.addScaledVector(d, 1.4 * power);
+      st.lastSeen.copy(st.p.root.position);
+    }
+  }
+
   // Le kaolin les renvoie là où le feu les a pris
   private kaolinStatues(dir: THREE.Vector3): void {
     for (const st of this.statues) {
@@ -1002,12 +1056,10 @@ export class Game {
   }
 
   // Une lumière pâle et froide au-dessus de la souche : là où le guérisseur parle
-  private spirit: THREE.PointLight | null = null;
+  private spirit: Glow | null = null;
   private spiritLight(): void {
     if (this.spirit) return;
-    this.spirit = new THREE.PointLight(0xc8dcff, 6, 9, 1.4);
-    this.spirit.position.set(0, 3.2, -19.2);
-    this.scene.add(this.spirit);
+    this.spirit = this.world.fx.addGlow(new THREE.Vector3(0, 3.2, -19.2), 0xc8dcff, 6, 9);
   }
 
   private camFlash(): void {
@@ -1099,7 +1151,7 @@ export class Game {
   // 2) la fuite : par les yeux d'Ayaba, à travers le village en flammes, jusqu'à la lagune
   // 3) la fin : Dah Agossou retourne dans le feu ; Ayaba tombe dans l'eau
   private fest: {
-    props: THREE.Object3D[]; fires: FireHandle[]; saved: { p: Person; x: number; z: number; ry: number; vis: boolean }[];
+    props: THREE.Object3D[]; fires: FireHandle[]; glows: Glow[]; saved: { p: Person; x: number; z: number; ry: number; vis: boolean }[];
     dancers: Person[]; agossou: Person | null; lamp: THREE.Object3D | null; barrels: THREE.Object3D | null;
     runners: { p: Person; dir: THREE.Vector3; t: number; fire: FireHandle | null }[];
   } | null = null;
@@ -1111,7 +1163,7 @@ export class Game {
     this.director.fadeTo(1, 1.2);
     this.audio.sfx('stinger3', { gain: 0.6 });
     setTimeout(() => {
-      const light = new THREE.PointLight(0xffa040, 0, 120, 1.2);
+      const light = this.world.fx.addGlow(new THREE.Vector3(38, 8, -5), 0xffa040, 0, 120);
       this.fb = { t: 0, ran: false, back: [this.player.pos.x, this.player.pos.z, this.player.yaw], weapon: this.viewmodel.current, light, done: false };
       this.viewmodel.equip(null);
       this.flashOn = false;
@@ -1133,6 +1185,7 @@ export class Game {
     const w = this.world;
     const props: THREE.Object3D[] = [];
     const fires: FireHandle[] = [];
+    const glows: Glow[] = [];
     const add = (name: ModelName, x: number, y: number, z: number, ry = 0, sc = 1) => {
       const o = instance(this.models, name, sc);
       if (!o) return null;
@@ -1146,15 +1199,13 @@ export class Game {
     const lamp = add('az-lamp', 38.1, 2.79, -5.55, 0, 1.6);
     if (lamp) {
       fires.push(w.fx.add(new THREE.Vector3(38.1, 3.0, -5.55), 0.1, { smoke: false, embers: false, color: 0xffb060 }));
-      const ll = new THREE.PointLight(0xffa050, 14, 10, 1.5);
-      ll.position.set(0, 0.25, 0.15);
-      lamp.add(ll);
+      const ll = w.fx.addGlow(new THREE.Vector3(), 0xffa050, 14, 10);
+      ll.follow = lamp;
+      ll.offset = new THREE.Vector3(0, 0.4, 0.2);
+      glows.push(ll);
     }
     // la lumière chaude de la fête au-dessus de la place
-    const festLight = new THREE.PointLight(0xffb070, 60, 30, 1.4);
-    festLight.position.set(0, 5, 9.4);
-    this.scene.add(festLight);
-    props.push(festLight);
+    glows.push(w.fx.addGlow(new THREE.Vector3(0, 5, 9.4), 0xffb070, 60, 30));
     this.renderer.toneMappingExposure = 2.2;
     const throneRy = Math.atan2(6.5, 3.9);
     add('az-throne', -6.5, 0, 5.5, throneRy);
@@ -1222,14 +1273,11 @@ export class Game {
       agossou.root.position.set(13, 0, 7.5);
       agossou.root.rotation.y = Math.atan2(25, -12.5);
       this.scene.add(agossou.root);
-      const al = new THREE.PointLight(0xffb070, 8, 7, 1.5);
-      al.position.set(12, 2.4, 8.8);
-      this.scene.add(al);
-      props.push(al);
+      glows.push(w.fx.addGlow(new THREE.Vector3(12, 2.4, 8.8), 0xffb070, 8, 7));
     }
     w.followGaze = false;
     w.flameScale = [1.6, 1, 1];
-    this.fest = { props, fires, saved, dancers, agossou, lamp, barrels, runners: [] };
+    this.fest = { props, fires, glows, saved, dancers, agossou, lamp, barrels, runners: [] };
   }
 
   private filmScene(): void {
@@ -1373,8 +1421,7 @@ export class Game {
     // Dah Agossou attend sur le chemin du nord et lui crie de courir
     if (fest.agossou) { fest.agossou.root.position.set(1.2, 0, -9); fest.agossou.root.rotation.y = 0; fest.agossou.play('Interact', 0.2); }
     if (this.houngbo) this.houngbo.root.visible = false;
-    fb.light.position.set(38, 8, -5);
-    this.scene.add(fb.light);
+    fb.light.pos.set(38, 8, -5);
     fb.light.intensity = 120;
     this.hud.setTracker('MEMORY — AYABA', 'RUN TO THE LAGOON. North, past the iroko.', 'Shift — run');
     this.director.fadeTo(0, 0.6);
@@ -1476,10 +1523,11 @@ export class Game {
     this.audio.loop('heartbeat', 0);
     this.audio.loop('fire', 0);
     setTimeout(() => {
-      this.scene.remove(fb.light);
+      this.world.fx.removeGlow(fb.light);
       if (fest) {
         for (const o of fest.props) this.scene.remove(o);
         for (const f of fest.fires) w.fx.remove(f);
+        for (const g of fest.glows) w.fx.removeGlow(g);
         for (const s of fest.saved) {
           s.p.root.position.set(s.x, 0, s.z);
           s.p.root.rotation.y = s.ry;
@@ -1523,9 +1571,7 @@ export class Game {
     h.play('Idle_Talking_Loop');
     this.audio.sfx('stinger2', { gain: 0.6 });
     // une lueur de braise, basse, qui éclaire son visage par en dessous
-    const faceLight = new THREE.PointLight(0xff8a3a, 7, 6, 1.6);
-    faceLight.position.set(at.x - f.x * 1.2, 0.6, at.z - f.z * 1.2);
-    this.scene.add(faceLight);
+    const faceLight = this.world.fx.addGlow(new THREE.Vector3(at.x - f.x * 1.2, 0.6, at.z - f.z * 1.2), 0xff8a3a, 7, 6);
     const eye = this.camera.position.clone().setY(2.25).addScaledVector(f, 0.4); // un peu au-dessus : rien ne cache le chef
     const head = new THREE.Vector3(at.x, 1.72, at.z);
     const fired = new Set<string>();
@@ -1556,7 +1602,7 @@ export class Game {
         done = true;
         truth(false);
         h.root.visible = false;
-        this.scene.remove(faceLight);
+        this.world.fx.removeGlow(faceLight);
         setFlag('act2');
         story.minutes = Math.max(story.minutes, 24 * 60);
         this.mode = 'playing';
@@ -1569,7 +1615,7 @@ export class Game {
   // ================================================================ ACTE III — LA NUIT DES AZÉVI
   private act3Ready = false;
   private nextRise = 0;
-  private hutGlow: THREE.PointLight[] = [];
+  private hutGlow: Glow[] = [];
   private rite: {
     phase: 0 | 1 | 2 | 3; t: number; spawned: number; repelled: number; hits: number; hCd: number; hWind: number; hVisible: number;
     verse: number; seq: string[]; idx: number; keyT: number; strikeT: number; strikeWarn: number; refillCd: number; ui: HTMLDivElement; plants: THREE.Object3D[]; pillar: THREE.Mesh | null;
@@ -1581,10 +1627,7 @@ export class Game {
     this.act3Ready = true;
     // les cases s'allument d'une lueur orange : le village est réveillé
     for (const [x, z] of [[-8, -7], [14, -11], [-23, -6], [20, 14], [-12, 18], [7, 21], [24, -23], [-27, -22], [12, -33], [-19, -38], [28, 4], [31, 22], [-33, 6]]) {
-      const l = new THREE.PointLight(0xff6a20, 5, 7, 1.6);
-      l.position.set(x, 1.2, z + 1.6);
-      this.scene.add(l);
-      this.hutGlow.push(l);
+      this.hutGlow.push(this.world.fx.addGlow(new THREE.Vector3(x, 1.2, z + 1.6), 0xff6a20, 5, 7));
     }
     // l'asen enfoui sous les ruines de la station, dégagé par l'explosion de minuit
     const a = instance(this.models, 'az-asen', 1.15);
@@ -1598,7 +1641,7 @@ export class Game {
   private act3Beats(dt: number): void {
     if (!hasFlag('act2') || hasFlag('ended')) return;
     this.setupAct3();
-    for (const l of this.hutGlow) l.intensity = 4 + Math.sin(this.time * 6 + l.position.x) * 1.2 + Math.random() * 0.6;
+    if (!this.joy) for (const l of this.hutGlow) l.intensity = 4 + Math.sin(this.time * 6 + l.pos.x) * 1.2 + Math.random() * 0.6;
     if (this.rite) { this.updateRite(dt); return; }
     // l'horloge avance vers l'aube (sauf pendant le rite)
     const before = story.minutes;
@@ -1713,6 +1756,18 @@ export class Game {
     this.audio.loop('credits', 0, dawn ? 'music/dawn.mp3' : 'music/theme.mp3');
   }
 
+  // Bouton « Credits » du menu : le film du générique, puis retour au titre.
+  // Version aube si la vraie fin a déjà été vue, sinon braises et cendre.
+  private async menuCredits(): Promise<void> {
+    if (this.mode !== 'menu') return;
+    this.audio.start();
+    this.menu.hide();
+    const dawn = endingsSeen().includes('healer');
+    await this.rollCredits(dawn, dawn ? 'Azé-tin sleeps in peace.' : 'Azé-tin is waiting.');
+    this.mode = 'menu';
+    this.menu.show(hasSave());
+  }
+
   private async finalScreen(title: string, lines: string[], credits = true): Promise<void> {
     setFlag('ended');
     clearSave();
@@ -1807,7 +1862,7 @@ export class Game {
     const r = this.rite, h = this.houngbo;
     if (!r || r.phase !== 2 || !h) return false;
     const d = h.root.position.clone().sub(this.player.pos).setY(0);
-    if (d.length() > range + 0.6 || d.normalize().dot(dir) < 0.45) return false;
+    if (d.length() > range + 0.7 || d.normalize().dot(dir) < 0.35) return false;
     r.hits++;
     this.sparks.burst(h.root.position.clone().setY(1.4), 50);
     this.audio.thud();
@@ -2092,7 +2147,7 @@ export class Game {
     }
     // plus de cendre : les feux des ruines s'éteignent, le feu de la place est un feu de fête
     w.flameScale = [1.2, 0, 0];
-    for (const l of this.hutGlow) l.visible = false;
+    for (const l of this.hutGlow) l.intensity = 0;
     this.audio.loop('festival', 0.7);
     this.audio.loop('fire', 0);
     this.joy = { people, props, fires: [] };
@@ -2206,6 +2261,7 @@ export class Game {
     this.last = now;
     this.time += dt;
     this.world.update(dt, this.time, this.camera.position);
+    this.adaptQuality(dt);
     // au menu : le coucher du soleil ; en jeu : l'heure de l'histoire
     this.world.sky.update(this.mode === 'menu' ? 19 * 60 + 6 : story.minutes, this.camera);
 
@@ -2229,6 +2285,31 @@ export class Game {
     if (this.mode === 'playing') this.mirror.render(this.renderer, this.scene);
     if (this.mode === 'dead') this.camera.position.y = Math.max(0.35, this.camera.position.y - dt * 1.2); // Happy s'effondre
     this.input.endFrame();
+  }
+
+  // Qualité automatique : si l'ordinateur peine (moins de ~28 images/s), on baisse la résolution de rendu ;
+  // s'il est à l'aise, on la remonte. Les ombres sautent en dernier recours.
+  private perfAcc = 0;
+  private perfN = 0;
+  private pixelRatio = Math.min(devicePixelRatio, 1.5);
+  private adaptQuality(dt: number): void {
+    if (this.mode !== 'playing' && this.mode !== 'cine') return;
+    this.perfAcc += dt;
+    this.perfN++;
+    if (this.perfAcc < 2.5) return;
+    const mean = this.perfAcc / this.perfN;
+    this.perfAcc = 0;
+    this.perfN = 0;
+    const max = Math.min(devicePixelRatio, 1.5);
+    let pr = this.pixelRatio;
+    if (mean > 1 / 28 && pr > 0.6) pr = Math.max(0.6, pr - 0.15);
+    else if (mean < 1 / 55 && pr < max) pr = Math.min(max, pr + 0.1);
+    if (mean > 1 / 22 && pr <= 0.6 && this.renderer.shadowMap.enabled) { this.renderer.shadowMap.enabled = false; this.flash.castShadow = false; }
+    if (pr !== this.pixelRatio) {
+      this.pixelRatio = pr;
+      this.renderer.setPixelRatio(pr);
+      this.renderer.setSize(innerWidth, innerHeight);
+    }
   }
 
   private updateMenuCamera(): void {
@@ -2325,6 +2406,7 @@ export class Game {
         if (this.mode !== 'playing') return;
         const dir = this.player.forward(this.v1).clone();
         if (this.riteStrike(dir, weapon.range)) return;
+        this.strikeStatues(dir, weapon.range, weapon.power);
         this.strikePeople(dir, weapon.range);
         const hits = this.enemies.strike(this.player.pos, dir, weapon.range, weapon.power);
         if (hits.length) {

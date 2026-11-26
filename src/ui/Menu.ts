@@ -5,6 +5,7 @@ import { ENDINGS, endingsSeen } from './Endings';
 export interface MenuActions {
   onNew(): void;
   onContinue(): void;
+  onCredits(): void;
 }
 
 const endingsPanel = () => {
@@ -33,8 +34,7 @@ export class Menu {
     this.root.id = 'menu';
     this.root.innerHTML = `
       <div class="menu-title">
-        <h1>AZETIN</h1>
-        <h2>The Last Healer</h2>
+        <img class="menu-logo" src="${import.meta.env.BASE_URL}ui/logo.png" alt="AZETIN — The Last Healer">
       </div>
       <nav>
         <button data-a="new">New game</button>
@@ -55,6 +55,7 @@ export class Menu {
         const a = b.dataset.a!;
         if (a === 'new') actions.onNew();
         else if (a === 'continue') actions.onContinue();
+        else if (a === 'credits') { this.panel.classList.remove('on'); actions.onCredits(); }
         else this.showPanel(a);
       });
     });

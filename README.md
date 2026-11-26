@@ -174,3 +174,10 @@ Le calao guide (son grave en deux temps, il crie depuis la direction de ce qu'il
 - **Icônes rendues dans Blender** (`tools/blender/icons.py` → `public/ui/icon-*.png`) : carte, carnet, polaroïds, cassette, lettre cachetée, combiné, appareil photo, bourse de cuir, hibou sculpté, roue dentée, boule de kaolin, braise (repère d'objectif), flèche peinte au kaolin (chant du rite). Plus aucun pictogramme ni emoji standard.
 - **Générique en « motion horror »** (`src/ui/Credits.ts`) après chaque fin : les noms naissent des braises, tressaillent, partent en cendre ; des yeux de hibou s'ouvrent dans le noir. Version blanc kaolin et or après la vraie fin.
 - **Fin IV** : après l'adieu d'Ayaba et la pousse d'iroko, le village revient au grand jour — tout le monde danse autour du feu sous les fanions, Kossi sourit, Dah Agossou bénit la fête — puis tous s'effacent dans la lumière, et Happy appelle sa mère.
+
+## Passe 10 — identité, performances, équilibrage
+
+- **Logo** (`public/ui/logo.png`, au menu et sur l'app « Azé-tin » du téléphone), **favicon** (`favicon.ico/.png`, `apple-touch-icon.png`, `icon-192/512.png`, `manifest.webmanifest`), **vignette** `public/thumbnail.jpg` (1280×720, pour OpenGame) et **image de partage** `public/og-image.jpg` (1200×630, balises Open Graph / Twitter dans `index.html`).
+- Téléphone : icônes modernes de smartphone ; l'app du jeu porte le logo.
+- **Performances** : une réserve fixe de 8 lumières partagées par tous les feux et lueurs (plus aucune recompilation de shaders en cours de jeu), shaders compilés au chargement, qualité automatique (résolution, puis ombres) si l'ordinateur peine.
+- **Combat** : Brûlés un peu moins rapides que Happy qui court, élan plus lisible, dégâts réduits, jamais plus de deux attaquants à la fois, visée plus tolérante. Les gens de cendre de la station peuvent être frappés (ils éclatent en cendre, reculent, et retombent en poussière au 3e coup).

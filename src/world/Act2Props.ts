@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { FireSystem, Glow } from './Fire';
 
 // Objets de l'Acte 2 : les 5 fragments du secret, la calebasse du guérisseur, les 3 plantes, le calao.
 // Petits objets faits dans le code (pas de Blender) : ils sont vus de près, à la lampe.
@@ -9,7 +10,7 @@ export interface Pickup {
   name: string;
   pos: THREE.Vector3;
   obj: THREE.Object3D;
-  glow: THREE.PointLight;
+  glow: Glow;
 }
 
 function canvasTex(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
@@ -182,15 +183,13 @@ export const PLANTS: { id: string; name: string; x: number; z: number; y?: numbe
   { id: 'liana', name: 'Moon liana', x: -16.8, z: -41.2 },                  // sur la case au bord de l'eau
 ];
 
-export function buildAct2Props(scene: THREE.Scene): { pickups: Pickup[]; hornbill: THREE.Object3D } {
+export function buildAct2Props(scene: THREE.Scene, fx: FireSystem): { pickups: Pickup[]; hornbill: THREE.Object3D } {
   const pickups: Pickup[] = [];
   const add = (kind: Pickup['kind'], id: string, name: string, x: number, z: number, y: number, obj: THREE.Object3D, color: number) => {
     obj.position.set(x, y, z);
     obj.rotation.y = (x * 7 + z * 3) % 6;
     scene.add(obj);
-    const glow = new THREE.PointLight(color, 1.4, 2.4, 2);
-    glow.position.set(x, y + 0.35, z);
-    scene.add(glow);
+    const glow = fx.addGlow(new THREE.Vector3(x, y + 0.35, z), color, 1.4, 2.4);
     pickups.push({ id, kind, name, pos: new THREE.Vector3(x, y, z), obj, glow });
   };
   for (const f of FRAGMENTS) add('fragment', f.id, f.name, f.x, f.z, f.y ?? 0.02, fragmentMesh(f.id), 0xffb070);
