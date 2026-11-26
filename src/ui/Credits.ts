@@ -10,11 +10,8 @@ const CARDS: Card[] = [
   { big: 'AZETIN', small: 'THE LAST HEALER', size: 1.6 },
   { small: 'A game by', big: 'HAPPY AZONDEKON' },
   { small: 'Studio', big: 'HEYHAPPY STUDIO' },
-  { small: 'Story · design · code · Blender', big: 'Happy Azondekon', size: 0.8 },
   { small: 'Voices · sound · music', big: 'ElevenLabs', size: 0.9 },
-  { small: 'Characters and animations', big: 'Quaternius · MakeHuman', size: 0.75 },
-  { small: 'Additional models (CC BY)', big: 'KolosStudios · hoxsvl · Alex Martire', size: 0.6 },
-  { small: 'Engine', big: 'three.js', size: 0.9 },
+  { small: '3D models (CC BY)', big: 'KolosStudios · hoxsvl · Alex Martire', size: 0.6 },
   { small: 'Made for', big: 'OpenGame Game Jam #1', size: 0.75 },
   { small: 'Azé-tin and its people are fictional.', big: 'To those who were never buried.', size: 0.62 },
 ];
