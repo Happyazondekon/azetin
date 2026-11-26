@@ -9,6 +9,7 @@ export class Hud {
   private marker: HTMLDivElement;
   private placename: HTMLDivElement;
   private grab: HTMLDivElement;
+  private kaolin: HTMLDivElement;
   private placeTimer = 0;
   private subTimer = 0;
   private toastTimer = 0;
@@ -29,6 +30,7 @@ export class Hud {
     this.marker = el('marker');
     this.placename = el('placename');
     this.grab = el('grabbed');
+    this.kaolin = el('kaolin');
   }
 
   // Objectif en cours, toujours visible en haut à gauche
@@ -52,6 +54,12 @@ export class Hud {
     this.placename.innerHTML = `${discovered ? '<small>Discovered</small>' : ''}${name}`;
     this.placename.classList.add('on');
     this.placeTimer = 3.2;
+  }
+
+  // Charges de kaolin (seulement quand Happy a la calebasse)
+  setKaolin(n: number | null): void {
+    this.kaolin.style.opacity = n === null ? '0' : '1';
+    if (n !== null) this.kaolin.innerHTML = `<span>Kaolin</span>${'●'.repeat(n)}${'○'.repeat(5 - n)}<small>Q</small>`;
   }
 
   setGrabbed(on: boolean): void {

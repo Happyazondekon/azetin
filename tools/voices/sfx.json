@@ -104,5 +104,34 @@
  "ui_back": {
   "text": "Short horror interface close sound: low muffled thump with a reversed whisper",
   "seconds": 0.6
+ },
+ "gong": {
+  "text": "Deep traditional African gong struck three times at midnight, long echo in the night",
+  "seconds": 6
+ },
+ "kaolin": {
+  "text": "Handful of white powder thrown hard, soft puff and whoosh, dust scattering",
+  "seconds": 1.2
+ },
+ "shutter": {
+  "text": "Smartphone camera shutter click, single",
+  "seconds": 0.6
+ },
+ "explosion": {
+  "text": "Massive fuel depot explosion at night, deep roar, fireball, debris falling, distant screams",
+  "seconds": 6
+ },
+ "festival": {
+  "text": "African village festival at night, talking drums, singing and joyful crowd, slightly distant",
+  "seconds": 15,
+  "loop": true
+ },
+ "tape": {
+  "text": "Old cassette tape inserted into a walkman, play button click, tape hiss",
+  "seconds": 2
+ },
+ "hornbill_far": {
+  "text": "Ground hornbill deep booming two-note call, distant, echoing over a lagoon at night",
+  "seconds": 3
  }
 }

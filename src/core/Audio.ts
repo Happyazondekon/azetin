@@ -55,7 +55,7 @@ export class Audio {
     this.preload(['sfx/owl.mp3', 'sfx/hornbill.mp3', 'sfx/stinger1.mp3', 'sfx/stinger2.mp3', 'sfx/stinger3.mp3', 'sfx/heartbeat.mp3',
       'sfx/night.mp3', 'sfx/drone.mp3', 'sfx/fire.mp3', 'sfx/whispers.mp3', 'sfx/ember.mp3', 'sfx/swing.mp3', 'sfx/impact.mp3',
       'sfx/tire_burst.mp3', 'sfx/owl_impact.mp3', 'sfx/car_drive.mp3', 'sfx/radio.mp3', 'sfx/phone_buzz.mp3', 'sfx/generator.mp3',
-      'sfx/laugh.mp3', 'sfx/breath.mp3', 'sfx/footsteps.mp3', 'sfx/ui_click.mp3', 'sfx/ui_hover.mp3', 'sfx/ui_back.mp3', 'music/theme.mp3', 'music/tension.mp3']);
+      'sfx/laugh.mp3', 'sfx/breath.mp3', 'sfx/footsteps.mp3', 'sfx/ui_click.mp3', 'sfx/ui_hover.mp3', 'sfx/ui_back.mp3', 'sfx/gong.mp3', 'sfx/kaolin.mp3', 'sfx/shutter.mp3', 'sfx/explosion.mp3', 'sfx/festival.mp3', 'sfx/tape.mp3', 'sfx/hornbill_far.mp3', 'music/theme.mp3', 'music/tension.mp3']);
   }
 
   /** Son d'interface (clic, survol, retour) : un coup sec et un souffle — l'horreur jusque dans les menus */
@@ -274,6 +274,11 @@ export class Audio {
     }
     // secours
     if (name === 'owl') this.owl(opts.pan ?? 0);
+    else if (name === 'hornbill' || name === 'hornbill_far') this.hornbillSynth(opts.pan ?? 0, opts.gain ?? 1);
+    else if (name === 'explosion') { this.stinger(1.4); this.thud(); }
+    else if (name === 'gong') this.gongSynth();
+    else if (name === 'kaolin') this.swoosh();
+    else if (name === 'shutter' || name === 'tape') this.buzz();
     else if (name.startsWith('stinger') || name === 'owl_impact' || name === 'tire_burst') this.stinger(name === 'stinger2' ? 0.6 : 1);
     else if (name === 'impact' || name === 'ember') this.thud();
     else if (name === 'swing') this.swoosh();
@@ -330,6 +335,44 @@ export class Audio {
       g.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
       s.connect(g).connect(this.master);
       s.start(t); s.stop(t + 1);
+    }
+  }
+
+  // Calao : deux notes graves, comme un tambour qui souffle (« hou-hou… hou »)
+  private hornbillSynth(pan: number, gain: number): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.master) return;
+    const p = ctx.createStereoPanner();
+    p.pan.value = Math.max(-1, Math.min(1, pan));
+    p.connect(this.master);
+    for (const [d, f] of [[0, 118], [0.42, 96]] as const) {
+      const t = ctx.currentTime + d;
+      const o = ctx.createOscillator();
+      o.frequency.setValueAtTime(f * 1.08, t);
+      o.frequency.exponentialRampToValueAtTime(f, t + 0.25);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.45 * gain, t + 0.06);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+      o.connect(g).connect(p);
+      o.start(t); o.stop(t + 0.4);
+    }
+  }
+
+  private gongSynth(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.master) return;
+    for (let i = 0; i < 3; i++) {
+      const t = ctx.currentTime + i * 1.6;
+      for (const f of [68, 102, 171]) {
+        const o = ctx.createOscillator();
+        o.frequency.value = f;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.3, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 2.2);
+        o.connect(g).connect(this.master);
+        o.start(t); o.stop(t + 2.3);
+      }
     }
   }
 

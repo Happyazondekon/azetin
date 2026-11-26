@@ -112,6 +112,25 @@ export class Enemies {
   }
 
   // Tous repartent (le 4×4 est un refuge, ou l'aube se lève)
+  // Kaolin : les Brûlés pris dans le nuage se souviennent qu'ils sont morts et fuient longtemps
+  repel(from: THREE.Vector3, dir: THREE.Vector3, range: number, seconds: number): number {
+    let n = 0;
+    for (const e of this.list) {
+      if (e.state === 'gone') continue;
+      const d = e.pos.clone().sub(from);
+      d.y = 0;
+      const dist = d.length();
+      if (dist > range) continue;
+      if (dist > 1.2 && d.normalize().dot(dir) < 0.35) continue;
+      if (e.state === 'grab') this.releaseGrab(e, true);
+      e.state = 'flee';
+      e.timer = seconds;
+      e.person.play('Walk_Loop');
+      n++;
+    }
+    return n;
+  }
+
   scatter(): void {
     for (const e of this.list) if (e.state !== 'gone') { e.state = 'flee'; e.timer = 6; e.person.play('Walk_Loop'); }
   }

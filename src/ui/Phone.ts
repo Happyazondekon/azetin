@@ -1,5 +1,6 @@
 import { story, clockText, hasFlag } from '../story/State';
 import { PLACES, PATHS, STEPS, currentStep } from '../story/Places';
+const GALLERY: [string, string][] = [['photo', 'Before — the felled iroko'], ['notebook', 'The chief’s debts'], ['tape', 'The healer’s warning'], ['register', 'Three hundred barrels'], ['drawing', 'The owl on the roof']];
 
 // Le smartphone de Happy (touche Tab). Le jeu continue pendant qu'il est ouvert,
 // sauf en pause (Échap), où il s'ouvre sur l'écran de pause.
@@ -171,16 +172,19 @@ export class Phone {
         break;
       case 'notes': {
         const cur = currentStep().index;
-        html = `${back}<h4>Act I — The village</h4><ol class="ph-steps">${STEPS.map((st, i) =>
+        const act = hasFlag('act2') ? 'Act III — The night of the Azévi' : hasFlag('act1') ? 'Act II — The station' : 'Act I — The village';
+        html = `${back}<h4>${act}</h4><ol class="ph-steps">${STEPS.map((st, i) =>
           i < cur || (st.done() && i !== cur) ? `<li class="done">${st.text}</li>`
             : i === cur ? `<li class="now">${st.text}<small>${st.hint}</small></li>`
               : `<li class="later">…</li>`).join('')}</ol>
-          <ul class="ph-list"><li>Parts for Kossi <b>${story.pieces}/3</b></li></ul>`;
+          <ul class="ph-list"><li>Parts for Kossi <b>${story.pieces}/3</b></li>${hasFlag('act1') ? `<li>Fragments of the secret <b>${story.secret}/5</b></li><li>Healer’s plants <b>${story.plantes}/3</b></li>` : ''}${hasFlag('calabash') ? `<li>Kaolin <b>${story.kaolin}/5</b> — refill at the healer’s asen</li>` : ''}</ul>`;
         break;
       }
       case 'gallery':
-        html = `${back}<h4>Gallery</h4><div class="ph-photos">${Array.from({ length: 5 }, (_, i) =>
-          `<div class="ph-photo ${i < story.secret ? '' : 'empty'}">${i < story.secret ? `Fragment ${i + 1}` : '?'}</div>`).join('')}</div>`;
+        // les fragments se rangent dans l'ordre de l'histoire, pas dans l'ordre où on les trouve
+        html = `${back}<h4>Gallery — the secret</h4><div class="ph-photos">${GALLERY.map(([id, name]) =>
+          `<div class="ph-photo ${hasFlag('frag_' + id) ? '' : 'empty'}">${hasFlag('frag_' + id) ? name : '?'}</div>`).join('')}</div>
+          <p class="ph-empty">${story.secret}/5 — ${story.secret >= 5 ? 'You know everything now.' : 'The rest is hidden in the village and at the station.'}</p>`;
         break;
       case 'messages':
         html = `${back}<h4>Mom</h4><div class="ph-thread">

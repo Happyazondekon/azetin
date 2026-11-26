@@ -12,6 +12,7 @@ export class Player {
   readonly radius = 0.35;
 
   private eye = 1.65;
+  heightScale = 1; // 0.65 pendant le flashback : on voit par les yeux d'Ayaba
   private bobT = 0;
   private moving = false;
   private readonly tmp = new THREE.Vector3();
@@ -61,7 +62,7 @@ export class Player {
     if (running && this.moving) this.stamina = Math.max(0, this.stamina - 18 * dt);
     else this.stamina = Math.min(100, this.stamina + (this.moving ? 8 : 14) * dt);
 
-    const targetEye = crouch ? 1.05 : 1.65;
+    const targetEye = (crouch ? 1.05 : 1.65) * this.heightScale;
     this.eye += (targetEye - this.eye) * Math.min(1, dt * 10);
     if (this.moving) this.bobT += dt * (running ? 11 : 7);
     this.syncCamera(this.moving ? Math.sin(this.bobT) * (running ? 0.045 : 0.025) : 0);

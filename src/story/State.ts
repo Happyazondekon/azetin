@@ -5,6 +5,7 @@ export interface StoryState {
   secret: number;       // fragments trouvés, 0 à 5
   plantes: number;      // 0 à 3
   pieces: number;       // 0 à 3
+  kaolin: number;       // charges de kaolin dans la calebasse, 0 à 5
   kossiTrust: boolean;
   battery: number;      // batterie du smartphone, 0 à 100
   souffle: number;      // la vie de Happy, 0 à 100
@@ -24,6 +25,7 @@ function fresh(): StoryState {
     secret: 0,
     plantes: 0,
     pieces: 0,
+    kaolin: 0,
     kossiTrust: true,
     battery: 64,
     souffle: 100,

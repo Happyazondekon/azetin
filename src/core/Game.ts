@@ -15,6 +15,8 @@ import { Sparks } from '../combat/Sparks';
 import type { Enemy } from '../combat/Enemies';
 import { PLACES, STEPS, currentStep, setAyabaPos } from '../story/Places';
 import { Director } from '../story/Director';
+import { buildAct2Props, type Pickup } from '../world/Act2Props';
+import { LAYER_SEEN, LAYER_TRUTH } from '../world/Village';
 import LINES from '../story/lines.json';
 import { buildPerson, type Person } from '../world/People';
 import type { Models } from '../world/Assets';
@@ -71,6 +73,16 @@ export class Game {
   private scareEl!: HTMLDivElement;
   private blackout = 0;                       // la torche se coupe une fraction de seconde
   private dossiLaughT = 0;
+  // ---- Acte II
+  private pickups: Pickup[] = [];
+  private hornbill!: THREE.Object3D;
+  private houngbo: Person | null = null;
+  private kaolinFx!: Sparks;
+  private kaolinCd = 0;
+  private nextHornbill = 0;
+  private act2Pending = false;
+  private fb: { t: number; ran: boolean; back: [number, number, number]; weapon: string | null; light: THREE.PointLight; done: boolean } | null = null;
+  private camFlashEl!: HTMLDivElement;
   private lastStep = -1;
   private hereId = '';
   private readonly proj = new THREE.Vector3();
@@ -117,6 +129,9 @@ export class Game {
     this.scareEl = document.createElement('div');
     this.scareEl.className = 'scareflash';
     root.appendChild(this.scareEl);
+    this.camFlashEl = document.createElement('div');
+    this.camFlashEl.className = 'camflash';
+    root.appendChild(this.camFlashEl);
     // Un son d'horreur sur chaque bouton du jeu (menu, téléphone, écrans de fin)
     document.addEventListener('pointerdown', (e) => {
       const b = (e.target as HTMLElement).closest('button, input, label');
@@ -153,6 +168,7 @@ export class Game {
     });
 
     void this.init();
+    if (location.hash.includes('test')) (window as unknown as { game: Game }).game = this; // outil de test automatique
   }
 
   // Chargement des modèles Blender, puis construction du village
@@ -161,6 +177,13 @@ export class Game {
     this.models = models;
     this.world = buildVillage(this.scene, models);
     this.buildFigure();
+    const a2 = buildAct2Props(this.scene);
+    this.pickups = a2.pickups;
+    this.hornbill = a2.hornbill;
+    this.kaolinFx = new Sparks(this.scene, 'kaolin');
+    this.houngbo = buildPerson(models, { id: 'houngbo', sex: 'm', height: 1.93, skin: '#4a3224', top: 'bomba', wax: ['#6a1a5a', '#c8a030', '#2a0e24'],
+      pants: '#2a0e24', beard: true, azevi: true, pose: 'Idle_Talking_Loop', slow: 0.6 });
+    if (this.houngbo) { this.houngbo.root.visible = false; this.scene.add(this.houngbo.root); }
     this.player = new Player(this.camera, this.world.colliders, this.world.bounds);
     this.enemies = new Enemies(this.scene, models, this.world.colliders, {
       onWindup: (e) => {
@@ -482,7 +505,7 @@ export class Game {
             this.setObjective('Act II — Bring power from the old fuel station (east of the village).');
           } else if (story.pieces >= 3 && !hasFlag('repaired')) {
             setFlag('repaired');
-            this.line('kossi_repaired', 8);
+            this.line(hasFlag('act2') ? 'kossi_after' : 'kossi_repaired', 8);
             this.advance(40);
             this.setObjective('Your 4×4 is fixed. Leave before dawn — or find out what happened to Azé-tin.');
           } else {
@@ -547,8 +570,25 @@ export class Game {
           this.enemies.spawn(new THREE.Vector3(30, 0, 6), false, 'stalk');
           this.enemies.spawn(new THREE.Vector3(46, 0, 4), false, 'stalk');
           this.hud.say('[Something stirs among the ruins]', 4);
+          setFlag('awake'); // le moteur a réveillé Houngbo
         },
       },
+      // ---- Acte II : la souche de Loko, la calebasse, l'asen, les fragments et les plantes
+      {
+        pos: new THREE.Vector3(0, 0, -17.6), range: 2.8,
+        label: () => (hasFlag('act1') && !hasFlag('agossou') ? 'Touch the stump of Loko' : null),
+        use: () => this.stumpScene(),
+      },
+      {
+        pos: new THREE.Vector3(-4.6, 0, -29.2), range: 2.4,
+        label: () => (hasFlag('calabash') && story.kaolin < 5 ? 'Fill the calabash with kaolin at the asen' : null),
+        use: () => { story.kaolin = 5; this.audio.sfx('kaolin', { gain: 0.5 }); this.hud.say('The calabash is full of white earth again. (5/5)', 3); this.save(); },
+      },
+      ...this.pickups.map((pk): Interactable => ({
+        pos: pk.pos.clone().setY(0), range: pk.kind === 'plant' && pk.id === 'flower' ? 3.2 : 2.2,
+        label: () => (pk.obj.visible && hasFlag('act1') ? (pk.kind === 'fragment' ? `Photograph: ${pk.name}` : pk.kind === 'plant' ? `Pick the ${pk.name.toLowerCase()}` : `Take ${pk.name}`) : null),
+        use: () => this.collect(pk),
+      })),
     ];
   }
 
@@ -695,6 +735,7 @@ export class Game {
         this.world.flameScale = [0.22, 0, 0];
         this.mode = 'playing';
         this.player.place(this.player.pos.x, this.player.pos.z, want);
+        this.startAct2();
       },
     });
   }
@@ -737,6 +778,8 @@ export class Game {
   private beats(dt: number): void {
     const pos = this.player.pos;
     const w = this.world;
+    if (this.fb) { this.updateFlashback(dt); return; }
+    this.act2Beats();
     // 1) La silhouette sur la route
     const fig = this.figure;
     if (fig) {
@@ -793,6 +836,289 @@ export class Game {
     const heart = Math.max(close < 14 ? 1 - close / 14 : 0, story.souffle < 50 ? (50 - story.souffle) / 50 : 0);
     this.audio.loop('heartbeat', heart * 0.9);
     this.audio.loop('tension', close < 10 ? 0.35 : 0, 'music/tension.mp3');
+  }
+
+  // ================================================================ ACTE II — LA STATION
+
+  private startAct2(): void {
+    // Ayaba part vers la souche de Loko ; un calao crie pour la première fois
+    this.walk('ayaba', [new THREE.Vector3(-3.5, 0, 10.5), new THREE.Vector3(0.5, 0, 5), new THREE.Vector3(3.5, 0, -3), new THREE.Vector3(2.4, 0, -15.8)]);
+    this.setObjective('Act II — The station. Follow the hornbill: Ayaba went to the stump of the sacred iroko, north of the square.');
+    setTimeout(() => {
+      if (this.mode !== 'playing') return;
+      this.audio.sfx('hornbill', { pan: this.panOf(new THREE.Vector3(0, 0, -20)), gain: 1 });
+      setTimeout(() => this.line('happy_hornbill', 5), 2200);
+    }, 6000);
+    this.nextHornbill = this.time + 50;
+  }
+
+  // Le calao guide : il crie depuis la direction de ce qu'il reste à trouver
+  private act2Beats(): void {
+    // les objets de l'Acte II n'apparaissent qu'après l'Acte I, et disparaissent une fois ramassés (aussi après un chargement)
+    for (const pk of this.pickups) {
+      const taken = hasFlag(pk.kind === 'fragment' ? 'frag_' + pk.id : pk.kind === 'plant' ? 'plant_' + pk.id : 'calabash');
+      pk.obj.visible = pk.glow.visible = hasFlag('act1') && !taken;
+    }
+    if (hasFlag('agossou') && !this.hornbill.visible && this.mode === 'playing') {
+      this.spiritLight();
+      this.hornbill.position.set(0.2, 2.1, -20.4);
+      this.hornbill.rotation.y = Math.PI * 0.85;
+      this.hornbill.visible = true;
+    }
+    if (!hasFlag('act1')) return;
+    if (!hasFlag('act2') && this.time > this.nextHornbill) {
+      this.nextHornbill = this.time + 40 + Math.random() * 25;
+      const t = this.target();
+      const left = this.pickups.find((p) => p.obj.visible);
+      const at = t ? new THREE.Vector3(t.x, 0, t.z) : left ? left.pos : null;
+      if (at) {
+        this.audio.sfx(at.distanceTo(this.player.pos) > 25 ? 'hornbill_far' : 'hornbill', { pan: this.panOf(at) });
+        if (!hasFlag('hornbillHint')) { setFlag('hornbillHint'); this.hud.say('[The hornbill calls — low, twice. It comes from where you need to go.]', 5); }
+      }
+    }
+    // Fin de l'Acte II : la batterie, la calebasse et 3 fragments du secret
+    if (!hasFlag('act2') && !this.act2Pending && hasFlag('power') && hasFlag('calabash') && story.secret >= 3 && !this.grab) {
+      this.act2Pending = true;
+      setTimeout(() => this.houngboScene(), 4000);
+    }
+  }
+
+  // Une lumière pâle et froide au-dessus de la souche : là où le guérisseur parle
+  private spirit: THREE.PointLight | null = null;
+  private spiritLight(): void {
+    if (this.spirit) return;
+    this.spirit = new THREE.PointLight(0xc8dcff, 6, 9, 1.4);
+    this.spirit.position.set(0, 3.2, -19.2);
+    this.scene.add(this.spirit);
+  }
+
+  private camFlash(): void {
+    this.audio.sfx('shutter');
+    this.camFlashEl.classList.add('on');
+    setTimeout(() => this.camFlashEl.classList.remove('on'), 60);
+  }
+
+  private collect(pk: Pickup): void {
+    if (pk.kind === 'calabash') {
+      setFlag('calabash');
+      story.kaolin = 5;
+      story.inventory.push('Calabash (kaolin)');
+      this.audio.sfx('kaolin', { gain: 0.5 });
+      this.hud.say('Dah Agossou’s calabash. Full of white earth. — Press Q (A on AZERTY) to throw kaolin.', 6);
+      setTimeout(() => this.line('agossou_calabash', 11), 3500);
+      this.advance(20);
+      this.setObjective('Search the old fuel station, east. The truth is in the ashes.');
+      return;
+    }
+    if (pk.kind === 'plant') {
+      story.plantes++;
+      story.inventory.push(pk.name);
+      setFlag('plant_' + pk.id);
+      this.line('happy_plant', 4);
+      if (!hasFlag('agossouPlants')) { setFlag('agossouPlants'); setTimeout(() => this.line('agossou_plants', 9), 4500); }
+      this.save();
+      return;
+    }
+    // un fragment du secret : Happy le photographie (galerie du téléphone)
+    story.secret++;
+    setFlag('frag_' + pk.id);
+    this.camFlash();
+    this.advance(10);
+    if (pk.id === 'tape') {
+      this.line('happy_frag_tape', 4);
+      setTimeout(() => { this.audio.sfx('tape'); setTimeout(() => this.line('agossou_tape', 8), 1600); }, 3800);
+    } else this.line(('happy_frag_' + pk.id) as LineId, 6);
+    if (pk.id === 'notebook') {
+      // piège : le hibou du chef garde sa case
+      setTimeout(() => { if (this.mode === 'playing' && !this.fb) { this.audio.sfx('owl', { gain: 1.3 }); this.owlQte = { t: 3.5, ok: false }; } }, 2500);
+    }
+    this.hud.objective(`Fragment of the secret ${story.secret}/5 — saved in your Gallery.`);
+    this.save();
+    if (story.secret === 3 && !hasFlag('flashback')) setTimeout(() => this.startFlashback(), pk.id === 'tape' ? 14000 : 6500);
+  }
+
+  // La souche de Loko : le calao s'y pose, Dah Agossou parle pour la première fois
+  private stumpScene(): void {
+    setFlag('agossou');
+    this.mode = 'cine';
+    const top = new THREE.Vector3(0, 2.15, -20);
+    const ayaba = this.world.people['ayaba'];
+    const from = this.camera.position.clone();
+    this.hornbill.position.set(-14, 9, -30);
+    this.hornbill.visible = true;
+    this.spiritLight();
+    const fired = new Set<string>();
+    const at = (k: string, t: number, now: number, f: () => void) => { if (now >= t && !fired.has(k)) { fired.add(k); f(); } };
+    let done = false;
+    this.director.play({
+      duration: 21,
+      update: (t) => {
+        // le calao arrive en planant et se pose sur la souche
+        const u = Math.min(1, t / 4.5);
+        const e = 1 - Math.pow(1 - u, 3);
+        this.hornbill.position.set(-14 + 14 * e, 9 - (9 - 2.1) * e + Math.sin(u * Math.PI) * 1.5, -30 + 10 * e);
+        this.hornbill.rotation.y = Math.atan2(14, 10) * (1 - e) + Math.PI * 0.85 * e;
+        this.camera.position.copy(from);
+        this.camera.lookAt(top.x, top.y - 0.4 + (1 - e) * 2, top.z);
+        at('cry', 4.6, t, () => this.audio.sfx('hornbill', { gain: 1.2 }));
+        at('ay', 1, t, () => { if (ayaba && ayaba.root.position.distanceTo(top) < 8) this.line('ayaba_stump', 8); });
+        at('ag', 9.5, t, () => { this.line('agossou_stump', 11); this.world.flameScale[0] = Math.max(this.world.flameScale[0], 0.22); });
+      },
+      end: () => {
+        if (done) return;
+        done = true;
+        this.hornbill.position.set(0.2, 2.1, -20.4);
+        this.hornbill.rotation.y = Math.PI * 0.85;
+        this.mode = 'playing';
+        this.advance(15);
+        this.setObjective('Find Dah Agossou’s calabash in his house, north, by the lagoon.');
+      },
+    });
+  }
+
+  // ---------------------------------------------------------------- Flashback : la nuit du feu, par les yeux d'Ayaba
+  private startFlashback(): void {
+    if (this.mode !== 'playing' || this.fb) { if (!hasFlag('flashback')) setTimeout(() => this.startFlashback(), 3000); return; }
+    setFlag('flashback');
+    this.director.fadeTo(1, 1.2);
+    this.audio.sfx('stinger3', { gain: 0.6 });
+    setTimeout(() => {
+      const light = new THREE.PointLight(0xffa040, 0, 120, 1.2);
+      light.position.set(38, 6, -6);
+      this.scene.add(light);
+      this.fb = { t: 0, ran: false, back: [this.player.pos.x, this.player.pos.z, this.player.yaw], weapon: this.viewmodel.current, light, done: false };
+      this.viewmodel.equip(null);
+      this.flashOn = false;
+      this.player.heightScale = 0.62;
+      this.player.place(2.2, 14, -1.25); // sur la place, tournée vers la station
+      for (const e of this.enemies.list) e.person.root.visible = false;
+      if (this.figure) this.figure.root.visible = false;
+      this.renderer.domElement.classList.add('flashback');
+      this.world.flameScale = [2.2, 1.5, 1.5];
+      this.audio.loop('festival', 0.6);
+      this.audio.loop('drone', 0);
+      this.director.fadeTo(0, 1.5);
+      this.director.title('TEN YEARS AGO', 'THE NIGHT OF THE FIRE', 4);
+      this.hud.setTracker('MEMORY', 'You are Ayaba. It is the night of the festival.', '');
+      setTimeout(() => this.line('flash_party', 6), 2500);
+    }, 1300);
+  }
+
+  private updateFlashback(dt: number): void {
+    const fb = this.fb!;
+    fb.t += dt;
+    const pos = this.player.pos;
+    // l'explosion
+    if (fb.t > 9 && !fb.ran) {
+      fb.ran = true;
+      this.audio.loop('festival', 0);
+      this.audio.sfx('explosion', { gain: 1.3 });
+      this.shake = 0.9;
+      this.scareEl.classList.add('on');
+      setTimeout(() => this.scareEl.classList.remove('on'), 350);
+      fb.light.intensity = 260;
+      for (let i = 0; i < 6; i++) this.sparks.burst(new THREE.Vector3(34 + Math.random() * 8, 1 + Math.random() * 3, -9 + Math.random() * 6), 60);
+      this.audio.voiceMix('help us help', 'f', { ghost: true, gain: 0.9 });
+      setTimeout(() => this.audio.voiceMix('fire fire run', 'm', { ghost: true, gain: 0.8, pan: 0.6 }), 700);
+      setTimeout(() => this.line('agossou_flash', 4), 1800);
+      this.hud.setTracker('MEMORY', 'RUN TO THE LAGOON — north, past the iroko.', 'Shift — run');
+    }
+    if (fb.ran) {
+      fb.light.intensity = Math.max(70, fb.light.intensity - dt * 120) * (0.85 + Math.random() * 0.3);
+      // le feu court derrière elle : braises, chaleur, cœur qui bat
+      if (Math.random() < dt * 6) this.sparks.burst(pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 8, 0.5, 3 + Math.random() * 4)), 18);
+      this.audio.loop('heartbeat', 1);
+      this.player.stamina = Math.max(this.player.stamina, 35); // un enfant qui court pour sa vie
+      const tgt = new THREE.Vector3(0, 0, -44).project(this.camera);
+      this.hud.setMarker(tgt.z < 1 ? (tgt.x * 0.5 + 0.5) * innerWidth : null, (-tgt.y * 0.5 + 0.5) * innerHeight, 'The lagoon');
+      // trop lent : le feu la rattrape, le souvenir recommence
+      if (fb.t > 9 + 70) {
+        this.director.fadeTo(1, 0.6);
+        this.audio.sfx('stinger1');
+        fb.t = 2; fb.ran = false; fb.light.intensity = 0;
+        setTimeout(() => { this.player.place(2.2, 14, -1.25); this.audio.loop('festival', 0.6); this.director.fadeTo(0, 1); this.hud.say('The fire was faster. Again — run north, to the water.', 4); }, 700);
+      }
+      if (pos.z < -41 && !fb.done) this.endFlashback();
+    }
+  }
+
+  private endFlashback(): void {
+    const fb = this.fb!;
+    fb.done = true;
+    this.director.fadeTo(1, 1);
+    this.audio.loop('heartbeat', 0);
+    setTimeout(() => {
+      this.scene.remove(fb.light);
+      this.renderer.domElement.classList.remove('flashback');
+      this.player.heightScale = 1;
+      this.player.place(fb.back[0], fb.back[1], fb.back[2]);
+      this.viewmodel.equip(fb.weapon as Parameters<Viewmodel["equip"]>[0]);
+      this.world.flameScale = [0.22, 0, 0];
+      for (const e of this.enemies.list) e.person.root.visible = true;
+      this.hud.setMarker(null);
+      this.fb = null;
+      this.director.fadeTo(0, 2);
+      this.line('ayaba_flash_end', 9);
+      this.advance(20);
+      this.save();
+    }, 1100);
+  }
+
+  // ---------------------------------------------------------------- Fin de l'Acte II : le chef Houngbo, minuit
+  private houngboScene(): void {
+    const h = this.houngbo;
+    if (this.mode !== 'playing' || this.fb || !h) { setTimeout(() => this.houngboScene(), 2500); return; }
+    this.mode = 'cine';
+    this.hud.setPrompt(null);
+    const f = this.player.forward(this.v1).clone();
+    const at = this.player.pos.clone().addScaledVector(f, 4.2);
+    h.root.position.set(at.x, 0, at.z);
+    h.root.rotation.y = Math.atan2(-f.x, -f.z);
+    h.root.visible = true;
+    h.play('Idle_Talking_Loop');
+    this.audio.sfx('stinger2', { gain: 0.6 });
+    // une lueur de braise, basse, qui éclaire son visage par en dessous
+    const faceLight = new THREE.PointLight(0xff8a3a, 7, 6, 1.6);
+    faceLight.position.set(at.x - f.x * 1.2, 0.6, at.z - f.z * 1.2);
+    this.scene.add(faceLight);
+    const eye = this.camera.position.clone();
+    const head = new THREE.Vector3(at.x, 1.72, at.z);
+    const fired = new Set<string>();
+    const once = (k: string, t: number, now: number, fn: () => void) => { if (now >= t && !fired.has(k)) { fired.add(k); fn(); } };
+    let done = false;
+    const truth = (on: boolean) => { this.camera.layers.set(0); this.camera.layers.enable(on ? LAYER_TRUTH : LAYER_SEEN); };
+    this.director.play({
+      duration: 24,
+      update: (t, dt) => {
+        h.update(dt);
+        this.camera.position.copy(eye);
+        this.camera.lookAt(head.x, head.y - 0.15, head.z);
+        once('offer', 1.2, t, () => this.line('houngbo_offer', 10));
+        // l'éclair de vérité : une fraction de seconde, on voit le village tel qu'il est
+        once('truth', 12, t, () => { truth(true); this.scare('stinger1'); setTimeout(() => truth(false), 380); });
+        once('crown', 13.2, t, () => this.line('happy_crown', 4));
+        once('gong', 17, t, () => {
+          this.audio.sfx('gong', { gain: 1.2 });
+          story.minutes = 24 * 60;
+          this.line('houngbo_midnight', 4);
+          for (const p of Object.values(this.world.people)) if (p.def.azevi && p.def.id !== 'dossi') p.play('Idle_Loop', 0.4);
+        });
+        once('gone', 20.5, t, () => { this.blackout = 0.5; h.root.visible = false; faceLight.intensity = 0; this.audio.sfx('laugh', { gain: 0.8 }); });
+        once('title', 21, t, () => this.director.title('THE NIGHT OF THE AZÉVI', 'ACT III', 5));
+      },
+      end: () => {
+        if (done) return;
+        done = true;
+        truth(false);
+        h.root.visible = false;
+        this.scene.remove(faceLight);
+        setFlag('act2');
+        story.minutes = Math.max(story.minutes, 24 * 60);
+        this.mode = 'playing';
+        this.nextOwl = this.time + 20;
+        this.setObjective('Midnight. Bring the battery to Kossi. Then choose: leave before dawn… or finish what the healer began.');
+      },
+    });
   }
 
   // Un personnage marche le long d'un chemin, puis s'arrête
@@ -899,7 +1225,7 @@ export class Game {
   private updatePlaying(dt: number): void {
     const locked = document.pointerLockElement === this.renderer.domElement;
 
-    if (this.input.wasPressed('Tab')) this.togglePhone();
+    if (this.input.wasPressed('Tab') && !this.fb) this.togglePhone();
     if (this.input.wasPressed('KeyM')) this.openMap();
     if (this.input.wasPressed('KeyF')) {
       if (story.battery > 5) this.flashOn = !this.flashOn;
@@ -911,7 +1237,7 @@ export class Game {
     // Batterie : le flash et l'écran du téléphone la vident, le 4×4 la recharge
     const nearCar = this.player.pos.distanceTo(this.world.points.car) < 3.4;
     if (nearCar && hasFlag('trunk')) story.battery = Math.min(100, story.battery + 2.5 * dt);
-    if (this.flashOn) story.battery -= 0.12 * dt;
+    if (this.flashOn && !this.fb) story.battery -= 0.12 * dt;
     if (this.phone.open) story.battery -= 0.06 * dt;
     story.battery = Math.max(0, story.battery);
     // à 5 %, le flash s'éteint (le téléphone garde de quoi afficher la carte) : retour au 4×4
@@ -932,12 +1258,12 @@ export class Game {
     this.flash.color.setHSL(0.1, 0.25 + (1 - k) * 0.5, 0.92 - (1 - k) * 0.2);
 
     // Rétroviseur (clic droit maintenu)
-    const wantMirror = this.input.rightDown && locked && !this.phone.open && story.inventory.includes('Rear-view mirror');
+    const wantMirror = this.input.rightDown && locked && !this.phone.open && !this.fb && story.inventory.includes('Rear-view mirror');
     this.mirror.update(dt, wantMirror, this.camera.position, this.player.yaw, this.player.pitch);
     if (this.mirror.raised > 0.8 && !hasFlag('sawDossi')) this.checkDossiInMirror();
 
     // Interaction (priorité : prise d'un Brûlé > choix > hibou > objet)
-    const it = this.phone.open || this.grab ? null : this.nearestInteractable();
+    const it = this.phone.open || this.grab || this.fb ? null : this.nearestInteractable();
     const charging = nearCar && hasFlag('trunk') && story.battery < 100;
     if (this.grab) {
       const g = this.grab;
@@ -990,11 +1316,29 @@ export class Game {
     this.viewmodel.update(dt, this.mirror.raised > 0.3 || this.phone.open, 0);
     this.sparks.update(dt);
 
+    // ---- Kaolin (touche A en AZERTY / Q en QWERTY) : un nuage blanc qui disperse les Brûlés ----
+    this.kaolinCd = Math.max(0, this.kaolinCd - dt);
+    if (this.input.wasPressed('KeyQ') && hasFlag('calabash') && !this.fb && locked && !this.phone.open && this.kaolinCd <= 0) {
+      if (story.kaolin <= 0) this.hud.say('The calabash is empty. Refill it at the healer’s asen.', 3);
+      else {
+        story.kaolin--;
+        this.kaolinCd = 0.9;
+        const dir = this.player.forward(this.v1).clone();
+        this.audio.sfx('kaolin');
+        this.kaolinFx.burst(this.camera.position.clone().addScaledVector(dir, 0.6).setY(1.3), 70, dir);
+        const n = this.enemies.repel(this.player.pos, dir, 6, 40);
+        if (this.grab && n) { this.grab = null; this.hud.setGrabbed(false); }
+        if (n) this.audio.voiceMix('aaah', 'm', { ghost: true, gain: 0.7, rate: 0.7 });
+      }
+    }
+    this.kaolinFx.update(dt);
+    this.hud.setKaolin(hasFlag('calabash') && !this.fb ? story.kaolin : null);
+
     // ---- Les Brûlés ; le 4×4 reste un refuge (ils n'osent pas approcher) ----
-    this.enemies.update(dt, this.player.pos, nearCar);
+    if (!this.fb) this.enemies.update(dt, this.player.pos, nearCar);
 
     // ---- Le hibou et son QTE : se cacher (C) ou regarder dans le rétroviseur ----
-    if (this.time > this.nextOwl && !this.owlQte) {
+    if (this.time > this.nextOwl && !this.owlQte && !this.fb) {
       this.audio.sfx('owl', { pan: Math.random() * 2 - 1 });
       if (!hasFlag('firstOwl')) {
         setFlag('firstOwl');
@@ -1002,7 +1346,7 @@ export class Game {
       } else if (hasFlag('trunk') && this.player.pos.distanceTo(this.world.points.car) > 15) {
         this.owlQte = { t: 3.5, ok: false };
       }
-      this.nextOwl = this.time + 50 + Math.random() * 40;
+      this.nextOwl = this.time + (hasFlag("act2") ? 28 + Math.random() * 20 : 50 + Math.random() * 40);
     }
     if (this.owlQte) {
       const q = this.owlQte;
@@ -1021,7 +1365,7 @@ export class Game {
       }
     }
 
-    this.guide();
+    if (!this.fb) this.guide();
     this.beats(dt);
 
     // ---- Souffle : remonte lentement si rien ne frappe, vite au 4×4 ----

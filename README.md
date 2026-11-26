@@ -150,3 +150,7 @@ et « vérité » brûlée (calque 2, visible seulement dans le rétroviseur).
 ## Mise en scène (passe 5)
 
 Prologue « The Road » (radio, appel à maman, le hibou dans le pare-brise, le pneu qui éclate), cartons d'actes, silhouette au bord de la route, chuchotements à la stèle et Ayaba qui surgit derrière, la place qui se lève, Mama Dossi qui rit dans ton dos, embuscade au zem, SMS de « H. », histoire de Kossi, battement de cœur et nappe sonore, fin de l'Acte 1 (les feux s'éteignent un à un), son d'horreur sur les clics. Espace pour passer une cinématique.
+
+## Acte II — La station (passe 6)
+
+Le calao guide (son grave en deux temps, il crie depuis la direction de ce qu'il reste à trouver). Scène de la souche de Loko (Dah Agossou parle), calebasse et kaolin (touche A en AZERTY / Q en QWERTY, 5 charges, recharge à l'asen), 5 fragments du secret photographiés dans la galerie du téléphone (2 au village, 3 à la station), 3 plantes du guérisseur, flashback jouable de la nuit du feu (au 3e fragment, par les yeux d'Ayaba), et la fin de l'acte : le chef Houngbo, l'éclair de vérité, minuit. Outil de test : `#test` expose `window.game`.

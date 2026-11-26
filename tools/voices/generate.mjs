@@ -77,6 +77,7 @@ async function lines() {
     ayaba: { stability: 0.6, similarity_boost: 0.8, style: 0.2 },
     radio: { stability: 0.6, similarity_boost: 0.75, style: 0.1 },
     houngbo: { stability: 0.6, similarity_boost: 0.8, style: 0.3 },
+    agossou: { stability: 0.75, similarity_boost: 0.8, style: 0.2 },
   };
   const dir = out('public/voices/lines');
   for (const [id, line] of Object.entries(all)) {
