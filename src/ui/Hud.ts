@@ -5,6 +5,11 @@ export class Hud {
   private subtitle: HTMLDivElement;
   private toast: HTMLDivElement;
   private veil: HTMLDivElement;
+  private tracker: HTMLDivElement;
+  private marker: HTMLDivElement;
+  private placename: HTMLDivElement;
+  private grab: HTMLDivElement;
+  private placeTimer = 0;
   private subTimer = 0;
   private toastTimer = 0;
 
@@ -20,6 +25,37 @@ export class Hud {
     this.prompt = el('prompt');
     this.subtitle = el('subtitle');
     this.toast = el('toast');
+    this.tracker = el('tracker');
+    this.marker = el('marker');
+    this.placename = el('placename');
+    this.grab = el('grabbed');
+  }
+
+  // Objectif en cours, toujours visible en haut à gauche
+  setTracker(step: string | null, text = '', keys = ''): void {
+    this.tracker.style.opacity = step ? '1' : '0';
+    if (step) this.tracker.innerHTML = `<div class="t-step">${step}</div><div class="t-text">${text}</div><div class="t-keys">${keys}</div>`;
+  }
+
+  // Repère d'objectif à l'écran (x, y en pixels ; edge = hors champ, collé au bord)
+  setMarker(x: number | null, y = 0, label = '', edge = false): void {
+    if (x === null) { this.marker.classList.remove('on'); return; }
+    this.marker.classList.add('on');
+    this.marker.classList.toggle('edge', edge);
+    this.marker.style.left = `${x}px`;
+    this.marker.style.top = `${y}px`;
+    this.marker.innerHTML = `<i></i>${label}`;
+  }
+
+  // Nom du lieu quand Happy y arrive
+  showPlace(name: string, discovered: boolean): void {
+    this.placename.innerHTML = `${discovered ? '<small>Discovered</small>' : ''}${name}`;
+    this.placename.classList.add('on');
+    this.placeTimer = 3.2;
+  }
+
+  setGrabbed(on: boolean): void {
+    this.grab.classList.toggle('on', on);
   }
 
   setPrompt(text: string | null): void {
@@ -47,11 +83,14 @@ export class Hud {
 
   hideAll(): void {
     this.setPrompt(null);
+    this.setTracker(null);
+    this.setMarker(null);
     this.subtitle.classList.remove('on');
     this.toast.classList.remove('on');
   }
 
   update(dt: number): void {
+    if (this.placeTimer > 0 && (this.placeTimer -= dt) <= 0) this.placename.classList.remove('on');
     if (this.subTimer > 0 && (this.subTimer -= dt) <= 0) this.subtitle.classList.remove('on');
     if (this.toastTimer > 0 && (this.toastTimer -= dt) <= 0) this.toast.classList.remove('on');
   }

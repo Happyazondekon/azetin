@@ -3,13 +3,25 @@ import { Input } from './Input';
 import { Audio } from './Audio';
 import { Player } from '../player/Player';
 import { buildVillage, type World } from '../world/Village';
+import { loadModels } from '../world/Assets';
 import { Mirror } from '../mirror/Mirror';
 import { Menu } from '../ui/Menu';
 import { Phone } from '../ui/Phone';
 import { Hud } from '../ui/Hud';
+import { GameOver, type DeathCause } from '../ui/GameOver';
+import { Enemies } from '../combat/Enemies';
+import { Viewmodel, WEAPONS, type WeaponDef } from '../combat/Weapon';
+import { Sparks } from '../combat/Sparks';
+import type { Enemy } from '../combat/Enemies';
+import { PLACES, STEPS, currentStep, setAyabaPos } from '../story/Places';
+import { Director } from '../story/Director';
+import LINES from '../story/lines.json';
+import { buildPerson, type Person } from '../world/People';
+import type { Models } from '../world/Assets';
 import { story, resetStory, loadGame, saveGame, hasSave, hasFlag, setFlag } from '../story/State';
 
-type Mode = 'menu' | 'playing' | 'paused';
+type Mode = 'menu' | 'playing' | 'paused' | 'dead' | 'cine';
+type LineId = Exclude<keyof typeof LINES, '_voices'>;
 
 interface Interactable {
   label: () => string | null; // null = rien à faire ici pour l'instant
@@ -25,8 +37,10 @@ export class Game {
   private last = performance.now();
   private input: Input;
   private audio = new Audio();
-  private world: World;
-  private player: Player;
+  private world!: World;
+  private player!: Player;
+  private ready = false;
+  private audioReady = false;
   private mirror = new Mirror();
   private flash: THREE.SpotLight;
   private flashOn = true;
@@ -36,7 +50,30 @@ export class Game {
   private mode: Mode = 'menu';
   private time = 0;
   private nextOwl = 0;
-  private interactables: Interactable[];
+  private interactables: Interactable[] = [];
+  private enemies!: Enemies;
+  private viewmodel: Viewmodel;
+  private gameOver: GameOver;
+  private attackCd = 0;
+  private lastHurt = -99;
+  private shake = 0;
+  private owlQte: { t: number; ok: boolean } | null = null;
+  private choice: { a: string; onA: () => void; b: string; onB: () => void } | null = null;
+  private nextMurmur = 0;
+  private fill!: THREE.SpotLight;
+  private sparks: Sparks;
+  private grab: { e: Enemy; presses: number; t: number } | null = null;
+  private markerOn = true;
+  private director!: Director;
+  private models!: Models;
+  private figure: Person | null = null;      // la silhouette au bord de la route
+  private figureT = 0;
+  private scareEl!: HTMLDivElement;
+  private blackout = 0;                       // la torche se coupe une fraction de seconde
+  private dossiLaughT = 0;
+  private lastStep = -1;
+  private hereId = '';
+  private readonly proj = new THREE.Vector3();
   private readonly v1 = new THREE.Vector3();
   private readonly v2 = new THREE.Vector3();
 
@@ -45,40 +82,65 @@ export class Game {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.45;
+    this.renderer.toneMappingExposure = 1.6;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     root.appendChild(this.renderer.domElement);
 
     // La caméra principale voit le décor (0) et l'apparence "vue" des personnages (1)
-    this.camera.layers.enable(1);
+    // (outil de test : #truth dans l'adresse montre la « vérité », comme dans le rétroviseur)
+    this.camera.layers.enable(location.hash.includes('truth') ? 2 : 1);
     this.scene.add(this.camera);
 
-    this.world = buildVillage(this.scene);
-    this.player = new Player(this.camera, this.world.colliders, this.world.bounds);
     this.input = new Input(this.renderer.domElement);
 
     // Le flash du smartphone : la seule lumière dynamique avec ombres
-    this.flash = new THREE.SpotLight(0xfff1dc, 90, 30, 0.45, 0.5, 1.2);
+    this.flash = new THREE.SpotLight(0xfff1dc, 38, 30, 0.45, 0.55, 1.15);
     this.flash.castShadow = true;
     this.flash.shadow.mapSize.set(1024, 1024);
     this.flash.shadow.camera.near = 0.2;
     this.flash.shadow.bias = -0.0006;
-    this.flash.position.set(0.18, -0.12, 0);
-    this.flash.target.position.set(0.05, -0.15, -1);
+    // le flash est tenu devant la main : l'arme reste dans l'ombre, hors du faisceau
+    this.flash.position.set(0.16, -0.1, -0.75);
+    this.flash.target.position.set(0.05, -0.15, -2);
     this.camera.add(this.flash, this.flash.target);
+    // halo large et doux autour du faisceau (une vraie torche éclaire aussi un peu à côté)
+    this.fill = new THREE.SpotLight(0xfff1dc, 6, 16, 1.0, 1, 1.6);
+    this.fill.position.copy(this.flash.position);
+    this.fill.target = this.flash.target;
+    this.camera.add(this.fill);
 
+    this.viewmodel = new Viewmodel(this.camera);
+    this.sparks = new Sparks(this.scene);
     this.hud = new Hud(root);
+    this.director = new Director(root);
+    this.scareEl = document.createElement('div');
+    this.scareEl.className = 'scareflash';
+    root.appendChild(this.scareEl);
+    // Un son d'horreur sur chaque bouton du jeu (menu, téléphone, écrans de fin)
+    document.addEventListener('pointerdown', (e) => {
+      const b = (e.target as HTMLElement).closest('button, input, label');
+      if (b) this.audio.ui((b as HTMLElement).matches('.ph-back, .ph-home') ? 'back' : 'click');
+    }, true);
+    let lastHover: Element | null = null;
+    document.addEventListener('pointerover', (e) => {
+      const b = (e.target as HTMLElement).closest('button');
+      if (b && b !== lastHover && this.audioReady) this.audio.ui('hover');
+      lastHover = b;
+    });
+    this.gameOver = new GameOver(root, () => this.wake());
     this.phone = new Phone(root, {
       onResume: () => this.resume(),
       onQuit: () => this.quitToTitle(),
       onClose: () => this.togglePhone(),
       onSensitivity: (v) => (this.player.sensitivity = v),
       onVolume: (v) => this.audio.setVolume(v),
+      onBrightness: (v) => (this.renderer.toneMappingExposure = v),
+      onMarker: (on) => (this.markerOn = on),
+      where: () => ({ x: this.player.pos.x, z: this.player.pos.z, yaw: this.player.yaw, target: this.target() }),
     });
     this.menu = new Menu(root, { onNew: () => this.start(false), onContinue: () => this.start(true) }, hasSave());
-
-    this.interactables = this.buildInteractables();
+    this.menu.setLoading('Searching for network… 0%');
 
     addEventListener('resize', () => this.resize());
     this.resize();
@@ -90,26 +152,113 @@ export class Game {
       if (document.hidden && this.mode === 'playing') this.pause();
     });
 
+    void this.init();
+  }
+
+  // Chargement des modèles Blender, puis construction du village
+  private async init(): Promise<void> {
+    const models = await loadModels((d, t) => this.menu.setLoading(`Searching for network… ${Math.round((d / t) * 100)}%`));
+    this.models = models;
+    this.world = buildVillage(this.scene, models);
+    this.buildFigure();
+    this.player = new Player(this.camera, this.world.colliders, this.world.bounds);
+    this.enemies = new Enemies(this.scene, models, this.world.colliders, {
+      onWindup: (e) => {
+        this.audio.grunt(e.person.def.sex, true, 1, this.panOf(e.pos));
+        this.shake = Math.max(this.shake, 0.08);
+      },
+      onHitPlayer: (dmg, e) => {
+        this.audio.thud();
+        this.audio.grunt('m', false, 0.6, 0);
+        this.hurt(dmg, e.fromOwl ? 'owl' : this.enemies.near(this.player.pos, 6) >= 2 ? 'crowd' : 'default');
+      },
+      onGrab: (e) => {
+        this.grab = { e, presses: 0, t: 2.2 };
+        this.hud.setGrabbed(true);
+        this.audio.grunt(e.person.def.sex, true, 1.2, 0);
+        this.shake = 0.4;
+      },
+    });
+    const ay = this.world.people['ayaba'];
+    if (ay) setAyabaPos(() => ({ x: ay.root.position.x, z: ay.root.position.z }));
+    this.interactables = this.buildInteractables();
+    this.ready = true;
+    this.menu.setLoading(null);
     this.renderer.setAnimationLoop(() => this.frame());
   }
 
   // ---------- États ----------
 
   private start(fromSave: boolean): void {
+    if (!this.ready) return;
     if (!(fromSave && loadGame())) resetStory();
     const p = story.pos;
-    if (p) this.player.place(p[0], p[1], p[2]);
+    // Outil de test : …/index.html#at=x,z,orientation place Happy directement à un endroit du village
+    const at = /^#at=(-?[\d.]+),(-?[\d.]+),?(-?[\d.]+)?/.exec(location.hash);
+    if (at) this.player.place(Number(at[1]), Number(at[2]), Number(at[3] ?? 0));
+    else if (p) this.player.place(p[0], p[1], p[2]);
     else this.player.place(this.world.points.spawn.x, this.world.points.spawn.z, 0);
     this.menu.hide();
     this.mode = 'playing';
+    this.resetDanger();
     this.audio.start();
+    this.audioReady = true;
     this.lock();
-    this.nextOwl = this.time + (hasFlag('trunk') ? 40 : 7);
+    if (!hasFlag('intro') && !at) {
+      this.prologue();
+      return;
+    }
+    this.nextOwl = this.time + (location.hash.includes('owl') ? 4 : hasFlag('trunk') ? 40 : 7);
     if (!fromSave || !hasFlag('intro')) {
       setFlag('intro');
-      this.hud.say('Happy: No signal… and now a flat. Perfect.', 5);
+      this.line('prologue_flat', 5);
       setTimeout(() => this.hud.objective(story.objective), 1200);
     }
+  }
+
+  // Remet à zéro les dangers (nouvelle partie, réveil après une mort)
+  private resetDanger(): void {
+    for (const e of this.enemies.list) this.scene.remove(e.person.root);
+    this.enemies.list = [];
+    this.owlQte = null;
+    this.grab = null;
+    this.hud.setGrabbed(false);
+    this.lastHurt = -99;
+    story.souffle = Math.max(story.souffle, 60);
+    this.viewmodel.equip(story.inventory.includes('Tire iron') ? 'Tire iron' : null);
+  }
+
+  private hurt(dmg: number, cause: DeathCause): void {
+    if (this.mode !== 'playing') return;
+    story.souffle -= dmg;
+    this.lastHurt = this.time;
+    this.shake = 0.35;
+    if (story.souffle <= 0) this.die(cause);
+  }
+
+  private die(cause: DeathCause): void {
+    this.mode = 'dead';
+    this.grab = null;
+    this.hud.setGrabbed(false);
+    this.hud.hideAll();
+    this.mirror.raised = 0;
+    document.exitPointerLock();
+    this.gameOver.show(cause);
+  }
+
+  // Après une mort : retour à la dernière sauvegarde (objectif ou 4×4)
+  private wake(): void {
+    this.gameOver.hide();
+    if (!loadGame()) resetStory();
+    story.souffle = 100;
+    const p = story.pos;
+    if (p) this.player.place(p[0], p[1], p[2]);
+    else this.player.place(this.world.points.spawn.x, this.world.points.spawn.z, 0);
+    this.mode = 'playing';
+    this.resetDanger();
+    this.nextOwl = this.time + 45;
+    this.lock();
+    this.line('happy_wake', 4);
   }
 
   private pause(): void {
@@ -131,7 +280,6 @@ export class Game {
     this.phone.hide();
     this.hud.hideAll();
     this.mode = 'menu';
-    this.audio.suspend();
     document.exitPointerLock();
     this.menu.show(hasSave());
   }
@@ -158,7 +306,7 @@ export class Game {
   private onLockChange(): void {
     const locked = document.pointerLockElement === this.renderer.domElement;
     // Échap libère la souris : on met en pause, sauf si c'est le téléphone qui l'a libérée
-    if (!locked && this.mode === 'playing' && !this.phone.open) this.pause();
+    if (!locked && this.mode === 'playing' && !this.phone.open && !this.gameOver.open) this.pause();
   }
 
   private save(): void {
@@ -172,14 +320,94 @@ export class Game {
 
   private setObjective(text: string): void {
     story.objective = text;
-    this.hud.objective(text);
     this.save();
+  }
+
+  // Cible du repère : l'étape en cours (ou le 4×4 quand la torche est morte)
+  private target(): { x: number; z: number } | null {
+    if (story.battery <= 5 && hasFlag('trunk')) return { x: 1.2, z: 68 };
+    return currentStep().step.target();
   }
 
   // ---------- Interactions (prologue et début de l'Acte 1) ----------
 
+  // Une réplique : sous-titre + voix (bruits de paroles à la hauteur de la voix du personnage)
+  // Une réplique de lines.json : la voix ElevenLabs si elle a été générée, sinon les bruits de paroles
+  private line(id: LineId, seconds = 6): void {
+    const l = LINES[id];
+    this.speak(l.who, l.text, seconds, id);
+  }
+
+  private speak(who: string, text: string, seconds = 6, id?: string): void {
+    const p = this.world.people[who];
+    const name = who === 'happy' ? 'Happy' : who === 'kossi' ? 'Kossi' : who === 'dossi' ? 'Mama Dossi' : who === 'ayaba' ? 'Ayaba' : who === 'radio' ? 'Radio' : '';
+    this.subtitles(name, text, seconds);
+    const d = p ? p.root.position.distanceTo(this.player.pos) : 0;
+    const gain = who === 'happy' ? 0.9 : who === 'radio' ? 0.7 : Math.max(0.3, 1 - d / 18);
+    const pan = p ? this.panOf(p.root.position) : 0;
+    const fallback = () => {
+      if (who === 'happy') this.audio.voiceMix(text, 'm', { gain: 0.55, rate: 1.04 });
+      else if (who === 'radio') this.audio.voiceMix(text, 'm', { gain: 0.35, rate: 1.1 });
+      else if (p) this.audio.voiceMix(text, p.def.child ? 'c' : p.def.sex, { gain, pan, ghost: p.def.azevi, rate: p.def.child ? 1.05 : 1 });
+    };
+    if (!id) return fallback();
+    void this.audio.playLine(id, { gain, pan, ghost: !!p?.def.azevi, radio: who === 'radio' }).then((dur) => {
+      if (!dur) fallback();
+      else if (dur + 0.6 > seconds) this.subtitles(name, text, dur + 0.6); // le sous-titre suit la durée de la voix
+    });
+  }
+
+  // Sous-titres : une longue réplique défile phrase par phrase
+  private subTimers: number[] = [];
+  private subtitles(name: string, text: string, seconds: number): void {
+    this.subTimers.forEach(clearTimeout);
+    this.subTimers = [];
+    const parts = text.length > 120 ? text.match(/[^.!?…]+[.!?…]+["”]?\s*|[^.!?…]+$/g) ?? [text] : [text];
+    // regroupe les morceaux trop courts
+    const chunks: string[] = [];
+    for (const p of parts) {
+      if (chunks.length && (chunks[chunks.length - 1].length + p.length) < 110) chunks[chunks.length - 1] += p;
+      else chunks.push(p);
+    }
+    let t = 0;
+    for (const c of chunks) {
+      const len = (seconds * c.length) / text.length;
+      this.subTimers.push(window.setTimeout(() => this.hud.say(name ? `${name}: ${c.trim()}` : c.trim(), len + 0.3), t * 1000));
+      t += len;
+    }
+  }
+
+  // Position gauche/droite d'un son par rapport au regard de Happy (−1 à 1)
+  private panOf(at: THREE.Vector3): number {
+    const d = this.v2.copy(at).sub(this.player.pos);
+    d.y = 0;
+    if (d.lengthSq() < 0.01) return 0;
+    d.normalize();
+    const f = this.player.forward(this.v1);
+    return THREE.MathUtils.clamp(f.x * d.z - f.z * d.x, -1, 1); // > 0 : à droite
+  }
+
+  // Un choix à deux touches (E / R)
+  private ask(a: string, onA: () => void, b: string, onB: () => void): void {
+    this.choice = { a, onA, b, onB };
+  }
+
+  private gain(item: string, line: LineId, delay = 0): void {
+    story.pieces += 1;
+    story.inventory.push(item);
+    if (delay) setTimeout(() => this.line(line, 5), delay);
+    else this.line(line, 5);
+    if (story.pieces === 2 && !hasFlag('msgH')) setTimeout(() => this.unknownMessage(), 9000);
+    this.advance(15);
+    const left = [!hasFlag('tube') && 'an inner tube (the old moto-taxi, west)', !hasFlag('patch') && 'a patch kit (Mama Dossi’s stall)',
+      !hasFlag('power') && 'power for the compressor (the old station, east)'].filter(Boolean);
+    this.setObjective(left.length ? `Bring Kossi three parts (${story.pieces}/3). Still missing: ${left.join(', ')}.` : 'Bring the parts back to Kossi.');
+  }
+
   private buildInteractables(): Interactable[] {
     const p = this.world.points;
+    const ayaba = this.world.people['ayaba'];
+    const ayabaPos = ayaba ? ayaba.root.position : new THREE.Vector3(-1.6, 0, 30.5);
     return [
       {
         pos: p.trunk, range: 2.2,
@@ -187,45 +415,423 @@ export class Game {
         use: () => {
           setFlag('trunk');
           story.inventory.push('Tire iron', 'Car jack', 'Rear-view mirror');
-          this.hud.say('Happy: The spare is flat too… There are lights up the road. Maybe someone can fix a tyre.', 6);
+          this.viewmodel.equip('Tire iron');
+          this.line('trunk', 7);
           this.advance(15);
           this.setObjective('Walk to the village. Find a vulcanizer.');
         },
       },
       {
-        pos: p.stele, range: 2.0,
-        label: () => 'Read the stone',
-        use: () => this.hud.say('Dozens of names, carved by hand. All with the same date. Ten years ago.', 6),
+        pos: p.car, range: 3.4,
+        label: () => (hasFlag('repaired') ? 'Drive away' : null),
+        use: () => this.ask('Drive away before dawn', () => this.ending(), 'Not yet', () => this.line('happy_notyet', 3)),
       },
       {
-        pos: p.kossi, range: 2.4,
-        label: () => 'Talk to the man by the tyres',
+        pos: p.stele, range: 2.0,
+        label: () => 'Read the stone',
         use: () => {
-          if (!hasFlag('kossi')) {
-            setFlag('kossi');
-            this.hud.say('Kossi: A tyre? I can fix it. But I need an inner tube, a patch kit, and power for my compressor. Go. And don’t stay out after midnight.', 8);
-            this.advance(20);
-            this.setObjective('Bring Kossi three parts: an inner tube, a patch kit, and power for the compressor.');
-          } else {
-            this.hud.say('Kossi: Here we don’t count the dead anymore. We count the living.', 5);
+          this.hud.say('“TO OUR DEAD.” Dozens of names, carved by hand. All with the same date. Ten years ago.', 6);
+          this.audio.sfx('whispers', { gain: 0.9 });
+          if (!hasFlag('ayaba') && !hasFlag('steleScare') && ayaba) {
+            setFlag('steleScare');
+            setTimeout(() => {
+              // elle est là, juste derrière
+              const f = this.player.forward(this.v1);
+              ayaba.root.position.set(this.player.pos.x - f.x * 1.5, 0, this.player.pos.z - f.z * 1.5);
+              ayaba.root.rotation.y = Math.atan2(f.x, f.z);
+              this.scare('stinger3', 0.5);
+              this.line('ayaba_appear', 5);
+            }, 4200);
           }
         },
       },
       {
-        pos: p.dossi, range: 2.4,
+        pos: ayabaPos, range: 2.4,
+        label: () => (ayaba && ayaba.root.visible ? 'Talk to the girl' : null),
+        use: () => {
+          if (!hasFlag('ayaba')) {
+            setFlag('ayaba');
+            this.line('ayaba_1', 7);
+            this.walk('ayaba', [new THREE.Vector3(-2.3, 0, 22), new THREE.Vector3(-3.4, 0, 14.5), new THREE.Vector3(-12.5, 0, 10.2)]);
+            this.setObjective('Follow the girl to the vulcanizer’s workshop.');
+          } else if (!hasFlag('sawDossi') && hasFlag('dossi')) {
+            this.line('ayaba_mirror', 7);
+          } else if (hasFlag('sawDossi') && !hasFlag('sawAyaba')) {
+            this.line('ayaba_know', 7);
+          } else {
+            this.line((['ayaba_owl', 'ayaba_grandpa', 'ayaba_station'] as const)[Math.floor(this.time) % 3], 6);
+          }
+        },
+      },
+      {
+        pos: p.kossi, range: 2.6,
+        label: () => 'Talk to the vulcanizer',
+        use: () => {
+          if (!hasFlag('kossi')) {
+            setFlag('kossi');
+            this.line('kossi_1', 8);
+            this.advance(20);
+            this.setObjective('Bring Kossi three parts: an inner tube (the old moto-taxi, west), a patch kit (Mama Dossi’s stall), power for the compressor.');
+          } else if (story.pieces >= 2 && !hasFlag('act1')) {
+            setFlag('act1');
+            story.inventory.push('Machete');
+            this.viewmodel.equip('Machete');
+            this.line('kossi_act1', 11);
+            setTimeout(() => this.endOfAct1(), 11500);
+            this.advance(30);
+            this.setObjective('Act II — Bring power from the old fuel station (east of the village).');
+          } else if (story.pieces >= 3 && !hasFlag('repaired')) {
+            setFlag('repaired');
+            this.line('kossi_repaired', 8);
+            this.advance(40);
+            this.setObjective('Your 4×4 is fixed. Leave before dawn — or find out what happened to Azé-tin.');
+          } else {
+            if (hasFlag('repaired')) this.line('kossi_why', 4);
+            else if (story.pieces >= 1 && !hasFlag('kossiStory')) {
+              setFlag('kossiStory');
+              this.line('kossi_story', 14); // l'histoire du feu, racontée à voix basse
+              this.world.flameScale[0] = 0.5;
+              setTimeout(() => (this.world.flameScale[0] = 1), 9000);
+            } else this.line('kossi_nag', 5);
+          }
+        },
+      },
+      {
+        pos: p.zem, range: 2.6,
+        label: () => (hasFlag('tube') ? null : 'Search the abandoned moto-taxi'),
+        use: () => {
+          if (!hasFlag('kossi')) {
+            this.hud.say('An abandoned moto-taxi. Its plate is melted. Someone left in a hurry… ten years ago.', 6);
+            return;
+          }
+          setFlag('tube');
+          this.gain('Inner tube', 'happy_tube');
+          this.ambush();
+        },
+      },
+      {
+        pos: p.dossi, range: 2.6,
         label: () => 'Talk to the woman at the stall',
         use: () => {
           if (!hasFlag('dossi')) {
             setFlag('dossi');
-            this.hud.say('Mama Dossi: Sit, my child. Eat some akassa. You must be so hungry…', 6);
+            this.line('dossi_1', 7);
+            this.ask('Eat the akassa', () => {
+              story.marque += 1;
+              setFlag('ate');
+              story.souffle = Math.min(100, story.souffle + 30);
+              this.line('dossi_ate', 6);
+              setFlag('patch');
+              this.gain('Patch kit', 'happy_ate', 5500);
+            }, 'Politely refuse', () => {
+              this.line('dossi_refuse', 6);
+              setFlag('patch');
+              this.gain('Patch kit', 'happy_patch', 5500);
+            });
           } else if (!hasFlag('sawDossi')) {
-            this.hud.say('She never blinks. Turn your back to her and look in the mirror (right click).', 6);
+            this.line('dossi_stare', 4);
           } else {
-            this.hud.say('Mama Dossi: Why do you look at me like that? Eat.', 5);
+            this.line('dossi_know', 6);
           }
         },
       },
+      {
+        pos: p.generator, range: 2.4,
+        label: () => (hasFlag('kossi') && !hasFlag('power') ? 'Take the generator battery' : null),
+        use: () => {
+          setFlag('power');
+          this.gain('Battery', 'happy_battery');
+          this.audio.sfx('generator', { pan: this.panOf(p.generator) });
+          // le bruit réveille le village : deux Brûlés rôdent autour de la station
+          this.audio.sfx('owl', { pan: this.panOf(p.station) });
+          this.enemies.spawn(new THREE.Vector3(30, 0, 6), false, 'stalk');
+          this.enemies.spawn(new THREE.Vector3(46, 0, 4), false, 'stalk');
+          this.hud.say('[Something stirs among the ruins]', 4);
+        },
+      },
     ];
+  }
+
+  // ---------- Mise en scène et frayeurs ----------
+
+  // Un « jump scare » : son, voile rouge, secousse, la torche se coupe un instant
+  private scare(sfx: string, k = 1): void {
+    this.audio.sfx(sfx, { gain: k });
+    this.scareEl.classList.add('on');
+    setTimeout(() => this.scareEl.classList.remove('on'), 160 + 140 * k);
+    this.shake = Math.max(this.shake, 0.3 * k);
+    this.blackout = 0.12 + 0.2 * k;
+  }
+
+  // PROLOGUE — LA ROUTE : radio, appel à maman, le hibou dans le pare-brise, le pneu éclate
+  private prologue(): void {
+    const car = this.world.car;
+    this.mode = 'cine';
+    this.viewmodel.equip(null);
+    const home = car ? { p: car.position.clone(), r: car.rotation.y } : null;
+    const V = THREE.Vector3;
+    const eye = new V(1.9, 2.3, -6.8), ahead = new V(0, 1.1, 7); // caméra de poursuite, derrière le 4×4
+    // le hibou : un corps sombre, deux ailes, deux yeux qui brillent dans les phares
+    const owl = new THREE.Group();
+    const dark = new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 1 });
+    owl.add(new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), dark));
+    for (const sx of [-1, 1]) {
+      const w = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.02, 0.2), dark);
+      w.position.x = sx * 0.3;
+      w.name = 'wing';
+      owl.add(w);
+      const e = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 4), new THREE.MeshBasicMaterial({ color: 0xffd23a }));
+      e.position.set(sx * 0.05, 0.05, 0.14);
+      owl.add(e);
+    }
+    owl.visible = false;
+    car?.add(owl);
+    const ev = { radioAt: 1.2, callAt: 13, owlAt: 19, fired: new Set<string>() };
+    const once = (k: string, t: number, f: () => void, now: number) => { if (now >= t && !ev.fired.has(k)) { ev.fired.add(k); f(); } };
+    let done = false;
+    this.director.fadeTo(1, 0);
+    this.director.fadeTo(0, 2.5);
+    this.director.title('THE ROAD', 'PROLOGUE', 4.5);
+    this.world.hazardsOn = false;
+    this.audio.loop('car_drive', 0.5);
+    this.audio.loop('radio', 0.12);
+    const scene = {
+      duration: 999,
+      update: (t: number) => {
+        once('radio', ev.radioAt, () => {
+          this.line('radio_news', 14);
+          void this.audio.playLine('radio_news', { gain: 0 }).then((d) => { if (d) { ev.callAt = ev.radioAt + d + 0.8; ev.owlAt = ev.callAt + 6; } });
+        }, t);
+        once('static', ev.callAt - 0.8, () => { this.audio.loop('radio', 0.35); setTimeout(() => this.audio.loop('radio', 0), 700); this.hud.say('[The radio loses the station]', 2); }, t);
+        once('call', ev.callAt, () => {
+          this.line('prologue_call', 7);
+          void this.audio.playLine('prologue_call', { gain: 0 }).then((d) => { if (d) ev.owlAt = ev.callAt + d - 0.9; });
+        }, t);
+        // le 4×4 avance sur la piste, en cahotant
+        if (car && home) {
+          const k = Math.min(1, t / ev.owlAt);
+          let z = home.p.z + 28 * (1 - k) + 3.3;
+          let r = home.r;
+          if (t > ev.owlAt) {
+            const u = Math.min(1, (t - ev.owlAt) / 1.6);
+            z = home.p.z + 3.3 * (1 - u * (2 - u));
+            r = home.r + Math.sin(u * Math.PI) * 0.25;
+          }
+          car.position.set(home.p.x, home.p.y + (t < ev.owlAt ? Math.sin(t * 7.3) * 0.015 + Math.sin(t * 2.1) * 0.02 : 0), z);
+          car.rotation.y = r;
+          car.updateMatrixWorld();
+          this.camera.position.copy(car.localToWorld(this.v1.copy(eye)));
+          this.camera.lookAt(car.localToWorld(this.v2.copy(ahead)));
+          if (this.shake > 0) {
+            this.shake = Math.max(0, this.shake - 1 / 60);
+            this.camera.position.x += (Math.random() - 0.5) * this.shake * 0.2;
+            this.camera.position.y += (Math.random() - 0.5) * this.shake * 0.2;
+          }
+          // le hibou surgit des ténèbres, droit sur le pare-brise
+          const o = (t - (ev.owlAt - 0.9)) / 0.9;
+          owl.visible = o > 0 && o < 1;
+          if (owl.visible) {
+            owl.position.set(0.3 + Math.sin(o * 9) * 0.2, 1.75 - o * 0.25, 14 - o * 12.2);
+            owl.children.forEach((c) => { if (c.name === 'wing') c.rotation.z = Math.sin(t * 30) * 0.6 * Math.sign(c.position.x); });
+          }
+        }
+        once('owl', ev.owlAt, () => { this.scare('owl_impact', 1.2); this.audio.sfx('owl', { gain: 1.2 }); this.hud.say('', 0.1); }, t);
+        once('tire', ev.owlAt + 0.45, () => { this.world.hazardsOn = true; this.audio.sfx('tire_burst'); this.shake = 0.5; this.audio.loop('car_drive', 0); }, t);
+        once('fade', ev.owlAt + 2.6, () => this.director.fadeTo(1, 1.2), t);
+        if (t > ev.owlAt + 4.2) scene.duration = 0;
+      },
+      end: () => {
+        if (done) return;
+        done = true;
+        car?.remove(owl);
+        this.world.hazardsOn = true;
+        if (car && home) { car.position.copy(home.p); car.rotation.y = home.r; }
+        this.audio.loop('car_drive', 0);
+        this.audio.loop('radio', 0);
+        this.player.place(this.world.points.spawn.x, this.world.points.spawn.z, 0);
+        this.mode = 'playing';
+        this.resetDanger();
+        this.director.fadeTo(0, 2);
+        this.director.title('THE VILLAGE THAT SLEEPS', 'ACT I', 4.5);
+        setFlag('intro');
+        setTimeout(() => { this.line('prologue_flat', 5); }, 1800);
+        setTimeout(() => this.hud.objective(story.objective), 6500);
+        this.nextOwl = this.time + 40;
+        this.save();
+      },
+    };
+    this.director.play(scene);
+  }
+
+  // Fin de l'Acte 1 : les feux du village s'éteignent un à un ; les hiboux crient
+  private endOfAct1(): void {
+    if (this.mode !== 'playing') return;
+    this.mode = 'cine';
+    this.hud.setPrompt(null);
+    const from = this.player.yaw;
+    const fire = this.world.fires[0];
+    const want = Math.atan2(-(fire.x - this.player.pos.x), -(fire.z - this.player.pos.z));
+    let done = false;
+    const fired = new Set<string>();
+    const at = (k: string, t: number, now: number, f: () => void) => { if (now >= t && !fired.has(k)) { fired.add(k); f(); } };
+    const out = (i: number) => { const f0 = this.world.flameScale[i]; let k = 0; const id = setInterval(() => { k += 0.1; this.world.flameScale[i] = Math.max(i === 0 ? 0.22 : 0, f0 * (1 - k)); if (k >= 1) clearInterval(id); }, 60); this.audio.sfx('ember', { gain: 0.6 }); };
+    this.director.play({
+      duration: 13,
+      update: (t) => {
+        let d = want - from;
+        d = Math.atan2(Math.sin(d), Math.cos(d));
+        const yaw = from + d * Math.min(1, t / 3) ;
+        this.camera.position.set(this.player.pos.x, 1.6 + Math.min(1, t / 6) * 0.25, this.player.pos.z);
+        this.camera.rotation.set(-0.06, yaw, 0, 'YXZ');
+        at('f0', 2, t, () => { out(0); this.audio.sfx('owl', { pan: -0.7 }); });
+        at('f1', 4.5, t, () => { out(1); this.audio.sfx('owl', { pan: 0.8, rate: 0.9 }); });
+        at('f2', 6.5, t, () => { out(2); this.audio.sfx('laugh', { gain: 0.5, pan: 0.6 }); });
+        at('wh', 8, t, () => this.audio.sfx('whispers', { gain: 1 }));
+        at('tt', 8.5, t, () => this.director.title('THE STATION', 'ACT II', 4.5));
+      },
+      end: () => {
+        if (done) return;
+        done = true;
+        this.world.flameScale = [0.22, 0, 0];
+        this.mode = 'playing';
+        this.player.place(this.player.pos.x, this.player.pos.z, want);
+      },
+    });
+  }
+
+  // Embuscade : à peine la chambre à air prise, des pas courent derrière Happy
+  private ambush(): void {
+    setTimeout(() => {
+      if (this.mode !== 'playing') return;
+      this.audio.sfx('footsteps', { gain: 1 });
+      setTimeout(() => {
+        if (this.mode !== 'playing') return;
+        const behind = this.player.forward(this.v2).multiplyScalar(-6).add(this.player.pos);
+        this.enemies.spawn(behind, false, 'chase');
+        this.scare('stinger2', 0.8);
+        this.line('happy_behind', 2);
+      }, 1600);
+    }, 3200);
+  }
+
+  // Un SMS d'un numéro inconnu… signé « H. » (Houngbo, le chef mort)
+  private unknownMessage(): void {
+    if (hasFlag('msgH')) return;
+    setFlag('msgH');
+    this.audio.sfx('phone_buzz');
+    this.hud.say('📱 Unknown number — “Welcome to Azé-tin… Stay for dinner. — H.”', 7);
+  }
+
+  // La silhouette au bord de la route : elle regarde le 4×4, puis disparaît quand la torche clignote
+  private buildFigure(): void {
+    const f = buildPerson(this.models, { id: 'figure', sex: 'm', height: 1.86, skin: '#3a2a20', top: 'bomba', wax: ['#2b1d16', '#3d2a1c', '#160f0b'],
+      pants: '#1a1612', azevi: true, pose: 'Idle_Loop', slow: 0.05 });
+    if (!f) return;
+    f.root.position.set(6.2, 0, 50.5);
+    f.root.rotation.y = Math.atan2(1.2 - 6.2, 68 - 50.5);
+    this.scene.add(f.root);
+    this.figure = f;
+  }
+
+  // Les « temps forts » de l'Acte 1, déclenchés par la position de Happy
+  private beats(dt: number): void {
+    const pos = this.player.pos;
+    const w = this.world;
+    // 1) La silhouette sur la route
+    const fig = this.figure;
+    if (fig) {
+      fig.update(dt);
+      const show = hasFlag('trunk') && !hasFlag('figure');
+      fig.root.visible = show;
+      if (show) {
+        const d = Math.hypot(fig.root.position.x - pos.x, fig.root.position.z - pos.z);
+        const f = this.player.forward(this.v1);
+        const look = ((fig.root.position.x - pos.x) * f.x + (fig.root.position.z - pos.z) * f.z) / Math.max(d, 0.01);
+        if (d < 16 && look > 0.8) this.figureT += dt;
+        if (this.figureT > 0.6 && !hasFlag('figCall')) { setFlag('figCall'); this.line('road_call', 4); }
+        if (d < 7 || this.figureT > 4.5) {
+          setFlag('figure');
+          this.scare('stinger3', 0.6);
+          setTimeout(() => this.line('road_gone', 4), 1200);
+        }
+      }
+    }
+    // 2) La place : tous les Azévi se lèvent et fixent Happy
+    if (hasFlag('kossi') && !hasFlag('plaza') && Math.hypot(pos.x - w.fires[0].x, pos.z - w.fires[0].z) < 6.5) {
+      setFlag('plaza');
+      for (const [id, p] of Object.entries(w.people)) {
+        if (!p.def.azevi || id === 'dossi') continue;
+        if (Math.hypot(p.root.position.x - pos.x, p.root.position.z - pos.z) < 12) p.play('Idle_Loop', 0.6);
+      }
+      this.audio.sfx('stinger2', { gain: 0.5 });
+      w.flameScale[0] = 0.4;
+      setTimeout(() => (w.flameScale[0] = hasFlag('act1') ? 0.22 : 1), 2500);
+      setTimeout(() => this.line('happy_plaza', 3), 900);
+    }
+    // 3) Mama Dossi rit dans ton dos, sa lampe s'étouffe
+    const dossi = w.people['dossi'];
+    if (dossi && hasFlag('dossi') && !hasFlag('dossiLaugh')) {
+      const d = dossi.root.position.distanceTo(pos);
+      if (d > 6 && d < 10) {
+        this.dossiLaughT += dt;
+        if (this.dossiLaughT > 0.5) {
+          setFlag('dossiLaugh');
+          this.audio.sfx('laugh', { gain: 0.8, pan: this.panOf(dossi.root.position) });
+          const keep = w.flameScale[2];
+          w.flameScale[2] = 0;
+          setTimeout(() => (w.flameScale[2] = keep), 1400);
+        }
+      }
+    }
+    // 4) Ambiance : nuit, feu, nappe sourde qui monte, battement de cœur quand ils approchent
+    this.audio.loop('night', 0.5);
+    const fireD = Math.hypot(pos.x - w.fires[0].x, pos.z - w.fires[0].z);
+    this.audio.loop('fire', w.flameScale[0] * Math.max(0, 1 - fireD / 12) * 0.7);
+    this.audio.loop('drone', 0.12 + story.pieces * 0.06 + (hasFlag('act1') ? 0.1 : 0));
+    let close = 99;
+    for (const e of this.enemies.list) close = Math.min(close, e.pos.distanceTo(pos));
+    const heart = Math.max(close < 14 ? 1 - close / 14 : 0, story.souffle < 50 ? (50 - story.souffle) / 50 : 0);
+    this.audio.loop('heartbeat', heart * 0.9);
+    this.audio.loop('tension', close < 10 ? 0.35 : 0, 'music/tension.mp3');
+  }
+
+  // Un personnage marche le long d'un chemin, puis s'arrête
+  private walkers: { id: string; path: THREE.Vector3[] }[] = [];
+  private walk(id: string, path: THREE.Vector3[]): void {
+    this.walkers = this.walkers.filter((w) => w.id !== id);
+    this.walkers.push({ id, path: [...path] });
+    this.world.people[id]?.play('Walk_Loop');
+  }
+  private updateWalkers(dt: number): void {
+    for (const w of this.walkers) {
+      const p = this.world.people[w.id];
+      if (!p || !w.path.length) continue;
+      const target = w.path[0];
+      const d = this.v2.copy(target).sub(p.root.position);
+      d.y = 0;
+      const dist = d.length();
+      if (dist < 0.15) {
+        w.path.shift();
+        if (!w.path.length) p.play('Idle_Loop');
+        continue;
+      }
+      p.root.rotation.y = Math.atan2(d.x, d.z);
+      p.root.position.addScaledVector(d.normalize(), Math.min(dist, 1.35 * dt));
+    }
+    this.walkers = this.walkers.filter((w) => w.path.length);
+  }
+
+  // Fin I (The Survivor) — ou fin II si la Marque est à 3 (la voiture ne démarre pas)
+  private ending(): void {
+    this.mode = 'dead';
+    this.hud.hideAll();
+    document.exitPointerLock();
+    if (story.marque >= 3) {
+      this.gameOver.showEnding('Ending II — The Azévi', ['The engine coughs, then nothing. In the rear-view mirror, your own face is ash.', 'Later, headlights on the road. You stand up. You walk towards them, smiling.']);
+    } else {
+      this.gameOver.showEnding('Ending I — The Survivor', ['You drive towards the dawn. The radio comes back. You call your mother, and you laugh, and you cannot stop.',
+        'In the rear-view mirror, on the back seat, an owl is watching you.', 'Azé-tin is waiting for the next one.']);
+    }
   }
 
   private nearestInteractable(): Interactable | null {
@@ -253,10 +859,21 @@ export class Game {
     const dt = Math.min((now - this.last) / 1000, 0.05);
     this.last = now;
     this.time += dt;
-    this.world.update(dt, this.time);
+    this.world.update(dt, this.time, this.camera.position);
+    // au menu : le coucher du soleil ; en jeu : l'heure de l'histoire
+    this.world.sky.update(this.mode === 'menu' ? 19 * 60 + 6 : story.minutes, this.camera);
 
+    this.audio.loop('theme', this.mode === 'menu' ? 0.55 : 0, 'music/theme.mp3');
     if (this.mode === 'menu') this.updateMenuCamera();
     else if (this.mode === 'playing') this.updatePlaying(dt);
+    else if (this.mode === 'cine') {
+      if (this.input.wasPressed('Space')) this.director.skip();
+      this.flash.visible = false;
+      this.fill.visible = false;
+      this.mirror.raised = 0;
+      this.hud.setPrompt(null);
+    }
+    this.director.update(dt);
 
     this.hud.update(dt);
     this.phone.tick();
@@ -264,6 +881,7 @@ export class Game {
 
     this.renderer.render(this.scene, this.camera);
     if (this.mode === 'playing') this.mirror.render(this.renderer, this.scene);
+    if (this.mode === 'dead') this.camera.position.y = Math.max(0.35, this.camera.position.y - dt * 1.2); // Happy s'effondre
     this.input.endFrame();
   }
 
@@ -274,6 +892,7 @@ export class Game {
     this.camera.position.set(f.x + Math.sin(a) * 8.5, 1.5 + Math.sin(this.time * 0.13) * 0.15, f.z + Math.cos(a) * 8.5);
     this.camera.lookAt(f);
     this.flash.visible = false;
+    this.fill.visible = false;
     this.mirror.raised = 0;
   }
 
@@ -281,45 +900,246 @@ export class Game {
     const locked = document.pointerLockElement === this.renderer.domElement;
 
     if (this.input.wasPressed('Tab')) this.togglePhone();
-    if (this.input.wasPressed('KeyF') && story.battery > 0) this.flashOn = !this.flashOn;
+    if (this.input.wasPressed('KeyM')) this.openMap();
+    if (this.input.wasPressed('KeyF')) {
+      if (story.battery > 5) this.flashOn = !this.flashOn;
+      else this.line('happy_flash_low', 4);
+    }
 
     this.player.update(dt, this.input, locked && !this.phone.open);
 
     // Batterie : le flash et l'écran du téléphone la vident, le 4×4 la recharge
     const nearCar = this.player.pos.distanceTo(this.world.points.car) < 3.4;
     if (nearCar && hasFlag('trunk')) story.battery = Math.min(100, story.battery + 2.5 * dt);
-    if (this.flashOn) story.battery -= 0.16 * dt;
-    if (this.phone.open) story.battery -= 0.08 * dt;
+    if (this.flashOn) story.battery -= 0.12 * dt;
+    if (this.phone.open) story.battery -= 0.06 * dt;
     story.battery = Math.max(0, story.battery);
-    if (story.battery <= 0) this.flashOn = false;
-    this.flash.visible = this.flashOn;
+    // à 5 %, le flash s'éteint (le téléphone garde de quoi afficher la carte) : retour au 4×4
+    if (story.battery <= 5 && this.flashOn) {
+      this.flashOn = false;
+      this.line('happy_flash_dead', 7);
+    }
+    // Le flash du téléphone baisse avec la batterie : plein jusqu'à 60 %, puis il faiblit, jaunit et vacille sous 15 %
+    this.flash.visible = this.fill.visible = this.flashOn;
+    const charge = THREE.MathUtils.clamp(story.battery / 60, 0, 1);
+    const k = 0.18 + 0.82 * Math.pow(charge, 0.8);
     const low = story.battery < 15;
-    this.flash.intensity = low && Math.random() < 0.08 ? 8 : 90;
+    if (this.blackout > 0) this.blackout -= dt;
+    const flicker = this.blackout > 0 ? 0 : low && Math.random() < 0.07 ? 0.15 : 1;
+    this.flash.intensity = 55 * k * flicker;
+    this.flash.distance = 14 + 18 * k;
+    this.fill.intensity = 6 * k * flicker;
+    this.flash.color.setHSL(0.1, 0.25 + (1 - k) * 0.5, 0.92 - (1 - k) * 0.2);
 
     // Rétroviseur (clic droit maintenu)
     const wantMirror = this.input.rightDown && locked && !this.phone.open && story.inventory.includes('Rear-view mirror');
     this.mirror.update(dt, wantMirror, this.camera.position, this.player.yaw, this.player.pitch);
     if (this.mirror.raised > 0.8 && !hasFlag('sawDossi')) this.checkDossiInMirror();
 
-    // Interaction
-    const it = this.phone.open ? null : this.nearestInteractable();
+    // Interaction (priorité : prise d'un Brûlé > choix > hibou > objet)
+    const it = this.phone.open || this.grab ? null : this.nearestInteractable();
     const charging = nearCar && hasFlag('trunk') && story.battery < 100;
-    this.hud.setPrompt(it ? `E — ${it.label()}` : charging ? `Phone charging… ${Math.round(story.battery)}%` : null);
-    if (it && this.input.wasPressed('KeyE')) it.use();
+    if (this.grab) {
+      const g = this.grab;
+      g.t -= dt;
+      if (this.input.wasPressed('KeyE')) { g.presses++; this.shake = Math.max(this.shake, 0.12); }
+      this.hud.setPrompt(`GRABBED! Mash E to break free  ${'\u25A0'.repeat(g.presses)}${'\u25A1'.repeat(Math.max(0, 6 - g.presses))}`);
+      if (g.presses >= 6 || g.t <= 0) {
+        const freed = g.presses >= 6;
+        this.grab = null;
+        this.hud.setGrabbed(false);
+        this.enemies.releaseGrab(g.e, freed);
+        if (freed) { this.line('happy_free', 2); this.sparks.burst(g.e.pos.clone().setY(1.3), 25); }
+      }
+    } else if (this.choice) {
+      const c = this.choice;
+      this.hud.setPrompt(`E — ${c.a}      R — ${c.b}`);
+      if (this.input.wasPressed('KeyE')) { this.choice = null; c.onA(); }
+      else if (this.input.wasPressed('KeyR')) { this.choice = null; c.onB(); }
+    } else {
+      if (!this.owlQte) this.hud.setPrompt(it ? `E — ${it.label()}` : charging ? `Phone charging… ${Math.round(story.battery)}%` : null);
+      if (it && this.input.wasPressed('KeyE')) it.use();
+    }
+    this.updateWalkers(dt);
+    this.murmurs();
+    if (this.mirror.raised > 0.8 && !hasFlag('sawAyaba') && hasFlag('ayaba')) this.checkAyabaInMirror();
 
-    // Le hibou : premier cri au début, puis de temps en temps (QTE à venir en semaine 2)
-    if (this.time > this.nextOwl) {
-      this.audio.owl(Math.random() * 2 - 1);
+    // ---- Combat : clé démonte-roue (1), cric (2), clic gauche pour frapper ----
+    if (this.input.wasPressed('Digit1') && story.inventory.includes('Tire iron')) this.viewmodel.equip('Tire iron');
+    if (this.input.wasPressed('Digit2') && story.inventory.includes('Car jack')) this.viewmodel.equip('Car jack');
+    if (this.input.wasPressed('Digit3') && story.inventory.includes('Machete')) this.viewmodel.equip('Machete');
+    this.attackCd = Math.max(0, this.attackCd - dt);
+    const weapon: WeaponDef | null = this.viewmodel.current ? WEAPONS[this.viewmodel.current] : null;
+    if (weapon && this.input.leftClicked && locked && !this.phone.open && this.mirror.raised < 0.3 && this.attackCd <= 0 && this.player.stamina > weapon.stamina * 0.5) {
+      this.attackCd = weapon.cooldown;
+      this.player.stamina = Math.max(0, this.player.stamina - weapon.stamina);
+      this.viewmodel.attack();
+      this.audio.swoosh();
+      setTimeout(() => {
+        if (this.mode !== 'playing') return;
+        const dir = this.player.forward(this.v1).clone();
+        this.strikePeople(dir, weapon.range);
+        const hits = this.enemies.strike(this.player.pos, dir, weapon.range, weapon.power);
+        if (hits.length) {
+          this.shake = Math.max(this.shake, 0.18);
+          this.audio.thud();
+          for (const h of hits) { this.sparks.burst(h, 30 + 15 * weapon.power); this.audio.grunt('m', true, 0.8, this.panOf(h)); }
+        }
+      }, 160);
+    }
+    this.viewmodel.update(dt, this.mirror.raised > 0.3 || this.phone.open, 0);
+    this.sparks.update(dt);
+
+    // ---- Les Brûlés ; le 4×4 reste un refuge (ils n'osent pas approcher) ----
+    this.enemies.update(dt, this.player.pos, nearCar);
+
+    // ---- Le hibou et son QTE : se cacher (C) ou regarder dans le rétroviseur ----
+    if (this.time > this.nextOwl && !this.owlQte) {
+      this.audio.sfx('owl', { pan: Math.random() * 2 - 1 });
       if (!hasFlag('firstOwl')) {
         setFlag('firstOwl');
         this.hud.say('[An owl screeches somewhere in the dark]', 4);
+      } else if (hasFlag('trunk') && this.player.pos.distanceTo(this.world.points.car) > 15) {
+        this.owlQte = { t: 3.5, ok: false };
       }
       this.nextOwl = this.time + 50 + Math.random() * 40;
     }
+    if (this.owlQte) {
+      const q = this.owlQte;
+      q.t -= dt;
+      const hiding = (this.input.down('KeyC') || this.input.down('ControlLeft')) && !this.input.down('KeyW') && !this.input.down('KeyS');
+      if (hiding || this.mirror.raised > 0.8) q.ok = true;
+      this.hud.setPrompt(`The owl screams — something is coming. Hide: hold C  ·  or raise the mirror (right click)   ${Math.ceil(q.t)}`);
+      if (q.t <= 0) {
+        this.owlQte = null;
+        if (q.ok) this.hud.say(this.mirror.raised > 0.5 ? 'Happy: In the mirror… someone walked past behind me. Burning.' : 'Happy: …It passed. Whatever it was.', 5);
+        else {
+          const behind = this.player.forward(this.v2).multiplyScalar(-13).add(this.player.pos);
+          this.enemies.spawn(behind, true, 'chase');
+          this.hud.say('Footsteps. Running. Behind you.', 4);
+        }
+      }
+    }
 
-    // Voile : rougit quand l'endurance est vide (le souffle viendra en semaine 2)
-    this.hud.setDanger(1 - this.player.stamina / 100);
+    this.guide();
+    this.beats(dt);
+
+    // ---- Souffle : remonte lentement si rien ne frappe, vite au 4×4 ----
+    if (this.time - this.lastHurt > 8) story.souffle = Math.min(100, story.souffle + (nearCar ? 6 : 1.2) * dt);
+    if (this.shake > 0) {
+      this.shake = Math.max(0, this.shake - dt);
+      this.camera.position.x += (Math.random() - 0.5) * this.shake * 0.25;
+      this.camera.position.y += (Math.random() - 0.5) * this.shake * 0.25;
+    }
+    this.hud.setDanger(Math.max(1 - story.souffle / 100, (1 - this.player.stamina / 100) * 0.45));
     story.minutes += dt / 6; // l'horloge avance aussi lentement en jouant
+  }
+
+  private openMap(): void {
+    if (this.mode !== 'playing') return;
+    this.phone.show('map');
+    document.exitPointerLock();
+  }
+
+  // Happy frappe un habitant : les Azévi se réveillent (Brûlés), Kossi et Ayaba ne l'oublieront pas
+  private strikePeople(dir: THREE.Vector3, range: number): void {
+    for (const [id, p] of Object.entries(this.world.people)) {
+      if (!p.root.visible) continue;
+      const d = this.v2.copy(p.root.position).sub(this.player.pos);
+      d.y = 0;
+      const dist = d.length();
+      if (dist > range || dist < 0.01 || (d.x * dir.x + d.z * dir.z) / dist < 0.5) continue;
+      if (id === 'dossi') { this.hud.say('Your arm stops in mid-air. You cannot bring yourself to strike her.', 4); continue; }
+      story.marque += id === 'kossi' || id === 'ayaba' ? 1 : 0;
+      if (id === 'kossi') {
+        story.kossiTrust = false;
+        this.line('kossi_mad', 6);
+        p.play('Hit_Chest', 0.1, true);
+        setTimeout(() => p.play('Idle_Loop'), 900);
+      } else if (id === 'ayaba') {
+        this.audio.voiceMix('no', 'c', { ghost: true, gain: 1 });
+        p.root.visible = false;
+        this.hud.say('The girl is gone. Where she stood, the ground is wet.', 5);
+      } else {
+        // un villageois immobile se réveille : c'est un Brûlé
+        delete this.world.people[id];
+        this.enemies.adopt(p);
+        this.sparks.burst(p.root.position.clone().setY(1.3), 35);
+        this.audio.grunt(p.def.sex, true, 1, this.panOf(p.root.position));
+      }
+      this.save();
+    }
+  }
+
+  // Repères : étape en cours (haut gauche), marqueur à l'écran, nom des lieux, découvertes pour la carte
+  private guide(): void {
+    const { step, index } = currentStep();
+    if (index !== this.lastStep) {
+      if (this.lastStep >= 0) this.hud.objective(step.text);
+      this.lastStep = index;
+    }
+    const dead = story.battery <= 5 && hasFlag('trunk');
+    this.hud.setTracker(dead ? 'Phone almost dead' : `Step ${index + 1} / ${STEPS.length}`, dead ? 'Go back to your 4\u00d74 to charge your phone (follow the orange hazard lights).' : step.text,
+      'Tab phone \u00b7 M map \u00b7 F torch \u00b7 Right click mirror');
+
+    // lieux : nom à l'arrivée, découverte pour la carte
+    let here = '';
+    for (const p of PLACES) {
+      if (Math.hypot(this.player.pos.x - p.x, this.player.pos.z - p.z) < p.r) { here = p.id; break; }
+    }
+    if (here && here !== this.hereId) {
+      const p = PLACES.find((x) => x.id === here)!;
+      const fresh = !story.discovered.includes(here);
+      if (fresh) { story.discovered.push(here); this.save(); }
+      this.hud.showPlace(p.name, fresh);
+    }
+    this.hereId = here;
+
+    // marqueur d'objectif projeté à l'écran (collé au bord s'il est hors champ)
+    const t = this.target();
+    if (!t || !this.markerOn || this.phone.open) { this.hud.setMarker(null); return; }
+    const dist = Math.hypot(t.x - this.player.pos.x, t.z - this.player.pos.z);
+    if (dist < 3) { this.hud.setMarker(null); return; }
+    this.proj.set(t.x, 1.6, t.z).project(this.camera);
+    const W = innerWidth, H = innerHeight;
+    let x = (this.proj.x * 0.5 + 0.5) * W, y = (-this.proj.y * 0.5 + 0.5) * H;
+    const behind = this.proj.z > 1;
+    let edge = behind || x < 40 || x > W - 40 || y < 60 || y > H - 60;
+    if (behind) { x = W - x; y = H - 70; }
+    x = Math.min(W - 40, Math.max(40, x));
+    y = Math.min(H - 70, Math.max(70, y));
+    if (behind) edge = true;
+    this.hud.setMarker(x, y, `${Math.round(dist)} m`, edge);
+  }
+
+  // Murmures : les Azévi proches chuchotent quand Happy passe (et parfois, de loin, des voix sans corps)
+  private murmurs(): void {
+    if (this.time < this.nextMurmur) return;
+    this.nextMurmur = this.time + 5 + Math.random() * 9;
+    let best: { p: THREE.Vector3; d: number; voice: { pitch: number; rate: number } } | null = null;
+    for (const [id, p] of Object.entries(this.world.people)) {
+      if (!p.def.azevi || id === 'dossi') continue;
+      const d = p.root.position.distanceTo(this.player.pos);
+      if (d < 12 && (!best || d < best.d)) best = { p: p.root.position, d, voice: p.voice };
+    }
+    if (best) this.audio.voiceMix('azé tin… ɖo… wa…', best.voice.pitch > 1.2 ? 'f' : 'm', { gain: 1 - best.d / 13, pan: this.panOf(best.p), ghost: true, whisper: true });
+    else if (Math.random() < 0.4) this.audio.voiceMix('voices far away in the night', Math.random() < 0.5 ? 'm' : 'f', { gain: 0.3, pan: Math.random() * 2 - 1, ghost: true });
+  }
+
+  // Ayaba dans le reflet : mouillée, pas brûlée
+  private checkAyabaInMirror(): void {
+    const a = this.world.people['ayaba'];
+    if (!a) return;
+    const d = this.v2.copy(a.root.position).sub(this.player.pos);
+    d.y = 0;
+    const dist = d.length();
+    if (dist > 9) return;
+    const fwd = this.player.forward(this.v1);
+    if ((d.x * fwd.x + d.z * fwd.z) / dist < -0.85) {
+      setFlag('sawAyaba');
+      this.line('happy_mirror_ayaba', 7);
+      this.save();
+    }
   }
 
   // Mama Dossi est-elle dans le reflet ? (derrière Happy, à moins de 10 m)
@@ -331,7 +1151,8 @@ export class Game {
     const fwd = this.player.forward(this.v1);
     if ((d.x * fwd.x + d.z * fwd.z) / dist < -0.85) {
       setFlag('sawDossi');
-      this.hud.say('Happy: Her face… In the mirror her face is burned.', 6);
+      this.line('happy_mirror_dossi', 6);
+      this.scare('stinger1');
       this.save();
     }
   }

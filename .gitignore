@@ -6,3 +6,6 @@ dist/
 .env.*
 # Fichiers de travail Blender (on ne versionne que les exports .glb)
 *.blend1
+# Dossier de travail Blender (aperçus, textures, .glb non compressés)
+tools/blender/work/
+!.env.example

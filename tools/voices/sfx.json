@@ -1,0 +1,108 @@
+{
+ "owl": {
+  "text": "A barn owl's piercing screech at night, close, eerie, in an African village",
+  "seconds": 2.5
+ },
+ "hornbill": {
+  "text": "African hornbill deep two-note call echoing across a lagoon at night",
+  "seconds": 3
+ },
+ "stinger1": {
+  "text": "Horror movie jump scare stinger, sharp dissonant string stab with a deep low boom",
+  "seconds": 2.5
+ },
+ "stinger2": {
+  "text": "Ominous horror whoosh rising into a muted metallic hit, tense",
+  "seconds": 3
+ },
+ "stinger3": {
+  "text": "Short eerie reversed choir swell ending abruptly, horror",
+  "seconds": 2.5
+ },
+ "heartbeat": {
+  "text": "Slow heavy human heartbeat, close, muffled, steady",
+  "seconds": 4,
+  "loop": true
+ },
+ "night": {
+  "text": "Tropical West African night ambience: crickets, frogs, distant insects, light wind in palm leaves",
+  "seconds": 20,
+  "loop": true
+ },
+ "drone": {
+  "text": "Dark horror ambient drone, low pulsing hum, unsettling, cinematic, no melody",
+  "seconds": 20,
+  "loop": true
+ },
+ "fire": {
+  "text": "Small wood fire crackling and popping at night",
+  "seconds": 10,
+  "loop": true
+ },
+ "whispers": {
+  "text": "Many ghostly voices whispering unintelligibly, layered, distant, horror",
+  "seconds": 6
+ },
+ "ember": {
+  "text": "Hot embers bursting and hissing on impact, short crackle",
+  "seconds": 1.2
+ },
+ "swing": {
+  "text": "Heavy metal tool swung fast through the air, single whoosh",
+  "seconds": 0.8
+ },
+ "impact": {
+  "text": "Blunt metal bar hitting a body, dull heavy thud",
+  "seconds": 0.8
+ },
+ "tire_burst": {
+  "text": "Car tire bursting loudly on a dirt road, then the car skidding and stopping",
+  "seconds": 3
+ },
+ "owl_impact": {
+  "text": "Large bird slamming into a car windshield, heavy thud and glass crack",
+  "seconds": 1.5
+ },
+ "car_drive": {
+  "text": "Inside an old 4x4 driving slowly on a bumpy dirt road at night, engine rumble",
+  "seconds": 12,
+  "loop": true
+ },
+ "radio": {
+  "text": "Old car radio static and tuning noise between stations",
+  "seconds": 4,
+  "loop": true
+ },
+ "phone_buzz": {
+  "text": "Smartphone vibrating once for a notification, short buzz",
+  "seconds": 1
+ },
+ "generator": {
+  "text": "Old diesel generator sputtering, coughing, then dying",
+  "seconds": 4
+ },
+ "laugh": {
+  "text": "Old woman's slow low laugh in the dark, eerie, distant",
+  "seconds": 3
+ },
+ "breath": {
+  "text": "Raspy ghoulish breathing and a low growl right next to the ear",
+  "seconds": 2
+ },
+ "footsteps": {
+  "text": "Fast bare footsteps running on dry dirt behind you, getting closer",
+  "seconds": 2.5
+ },
+ "ui_click": {
+  "text": "Short dark horror interface click: a dry wooden knock with a faint breathy whisper tail",
+  "seconds": 0.6
+ },
+ "ui_hover": {
+  "text": "Very soft eerie low whoosh, like a breath passing by, short",
+  "seconds": 0.5
+ },
+ "ui_back": {
+  "text": "Short horror interface close sound: low muffled thump with a reversed whisper",
+  "seconds": 0.6
+ }
+}

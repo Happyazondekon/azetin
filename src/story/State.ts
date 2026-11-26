@@ -7,9 +7,11 @@ export interface StoryState {
   pieces: number;       // 0 à 3
   kossiTrust: boolean;
   battery: number;      // batterie du smartphone, 0 à 100
+  souffle: number;      // la vie de Happy, 0 à 100
   objective: string;
   inventory: string[];
   flags: string[];
+  discovered: string[]; // lieux découverts (carte du téléphone)
   pos: [number, number, number] | null; // x, z, yaw
 }
 
@@ -24,9 +26,11 @@ function fresh(): StoryState {
     pieces: 0,
     kossiTrust: true,
     battery: 64,
+    souffle: 100,
     objective: 'Check the 4×4. Search the trunk.',
     inventory: [],
     flags: [],
+    discovered: [],
     pos: null,
   };
 }

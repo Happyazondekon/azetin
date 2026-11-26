@@ -1,4 +1,5 @@
 import { story, clockText, hasFlag } from '../story/State';
+import { PLACES, PATHS, STEPS, currentStep } from '../story/Places';
 
 // Le smartphone de Happy (touche Tab). Le jeu continue pendant qu'il est ouvert,
 // sauf en pause (Échap), où il s'ouvre sur l'écran de pause.
@@ -8,11 +9,15 @@ export interface PhoneActions {
   onClose(): void;
   onSensitivity(v: number): void;
   onVolume(v: number): void;
+  onBrightness(v: number): void;
+  onMarker(on: boolean): void;
+  where(): { x: number; z: number; yaw: number; target: { x: number; z: number } | null };
 }
 
-type Screen = 'home' | 'notes' | 'gallery' | 'messages' | 'recorder' | 'bag' | 'endings' | 'settings' | 'pause';
+type Screen = 'home' | 'map' | 'notes' | 'gallery' | 'messages' | 'recorder' | 'bag' | 'endings' | 'settings' | 'pause';
 
 const APPS: { id: Screen; name: string; glyph: string }[] = [
+  { id: 'map', name: 'Map', glyph: '⌖' },
   { id: 'notes', name: 'Notes', glyph: '✎' },
   { id: 'gallery', name: 'Gallery', glyph: '▣' },
   { id: 'messages', name: 'Messages', glyph: '✉' },
@@ -31,6 +36,8 @@ export class Phone {
   private bat: HTMLSpanElement;
   sensitivity = 1;
   volume = 0.8;
+  brightness = 1.6;
+  marker = true;
 
   constructor(parent: HTMLElement, private actions: PhoneActions) {
     this.root = document.createElement('div');
@@ -80,6 +87,73 @@ export class Phone {
     this.time.textContent = clockText();
     this.bat.textContent = `${Math.round(story.battery)}%`;
     this.root.classList.toggle('low', story.battery < 15);
+    if (this.screen === 'map') this.drawMap();
+  }
+
+  // ---------------------------------------------------------------- carte : se remplit au fil des découvertes
+  private drawMap(): void {
+    const cv = this.body.querySelector<HTMLCanvasElement>('canvas.ph-map');
+    if (!cv) return;
+    const g = cv.getContext('2d')!;
+    const W = cv.width, H = cv.height;
+    // monde : x de −42 à 50, z de −50 (nord, en haut) à 75 (sud, en bas)
+    const x0 = -42, x1 = 50, z0 = -50, z1 = 75;
+    const sx = (x: number) => ((x - x0) / (x1 - x0)) * W;
+    const sz = (z: number) => ((z - z0) / (z1 - z0)) * H;
+    g.fillStyle = '#16120f';
+    g.fillRect(0, 0, W, H);
+    // lagune au nord
+    g.fillStyle = '#10202c';
+    g.fillRect(0, 0, W, sz(-46));
+    g.fillStyle = '#3a5a70';
+    g.font = '600 10px system-ui';
+    g.fillText('LAGOON', 8, sz(-46) - 6);
+    const known = new Set(story.discovered);
+    // chemins découverts
+    g.strokeStyle = '#7a4a30';
+    g.lineWidth = 4;
+    g.lineCap = g.lineJoin = 'round';
+    for (const [a, b, pts] of PATHS) {
+      if (!known.has(a) && !known.has(b)) continue;
+      g.globalAlpha = known.has(a) && known.has(b) ? 1 : 0.35;
+      g.beginPath();
+      pts.forEach(([x, z], i) => (i ? g.lineTo(sx(x), sz(z)) : g.moveTo(sx(x), sz(z))));
+      g.stroke();
+    }
+    g.globalAlpha = 1;
+    // lieux
+    for (const p of PLACES) {
+      if (!known.has(p.id)) continue;
+      g.fillStyle = p.id === 'car' ? '#ffb27a' : '#e8e0cc';
+      g.beginPath();
+      g.arc(sx(p.x), sz(p.z), 4.5, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#cfc6b8';
+      g.font = '11px system-ui';
+      const label = p.name.split(' — ')[0];
+      const tw = g.measureText(label).width;
+      g.fillText(label, Math.min(W - tw - 4, Math.max(4, sx(p.x) - tw / 2)), sz(p.z) - 8);
+    }
+    const w = this.actions.where();
+    // objectif : un anneau orange qui pulse
+    if (w.target) {
+      const k = 6 + 3 * Math.sin(performance.now() / 250);
+      g.strokeStyle = '#ff6a1f';
+      g.lineWidth = 2.5;
+      g.beginPath();
+      g.arc(sx(w.target.x), sz(w.target.z), k, 0, Math.PI * 2);
+      g.stroke();
+    }
+    // Happy : une flèche dans la direction du regard
+    g.save();
+    g.translate(sx(w.x), sz(w.z));
+    g.rotate(-w.yaw);
+    g.fillStyle = '#7fb0ff';
+    g.beginPath();
+    g.moveTo(0, -9); g.lineTo(6, 7); g.lineTo(0, 3); g.lineTo(-6, 7);
+    g.closePath();
+    g.fill();
+    g.restore();
   }
 
   go(screen: Screen): void {
@@ -91,14 +165,19 @@ export class Phone {
         html = `<div class="ph-lock"><div class="ph-clock">${clockText()}</div><div class="ph-date">Thursday · No service</div></div>
           <div class="ph-grid">${APPS.map((a) => `<button class="ph-app" data-go="${a.id}"><i>${a.glyph}</i>${a.name}</button>`).join('')}</div>`;
         break;
-      case 'notes':
-        html = `${back}<h4>Notes</h4><p class="ph-obj">${story.objective}</p>
-          <ul class="ph-list">
-            <li>Parts for Kossi <b>${story.pieces}/3</b></li>
-            <li>Plants <b>${story.plantes}/3</b></li>
-            <li>Fragments <b>${story.secret}/5</b></li>
-          </ul>`;
+      case 'map':
+        html = `${back}<h4>Map</h4><canvas class="ph-map" width="264" height="380"></canvas>
+          <p class="ph-empty">Places appear as you discover them. Orange ring: your objective.</p>`;
         break;
+      case 'notes': {
+        const cur = currentStep().index;
+        html = `${back}<h4>Act I — The village</h4><ol class="ph-steps">${STEPS.map((st, i) =>
+          i < cur || (st.done() && i !== cur) ? `<li class="done">${st.text}</li>`
+            : i === cur ? `<li class="now">${st.text}<small>${st.hint}</small></li>`
+              : `<li class="later">…</li>`).join('')}</ol>
+          <ul class="ph-list"><li>Parts for Kossi <b>${story.pieces}/3</b></li></ul>`;
+        break;
+      }
       case 'gallery':
         html = `${back}<h4>Gallery</h4><div class="ph-photos">${Array.from({ length: 5 }, (_, i) =>
           `<div class="ph-photo ${i < story.secret ? '' : 'empty'}">${i < story.secret ? `Fragment ${i + 1}` : '?'}</div>`).join('')}</div>`;
@@ -109,7 +188,7 @@ export class Phone {
           <div class="msg out">Almost there mum! GPS is dead lol</div>
           <div class="msg out fail">The car broke down. Some village called Azé-tin. Don't worry.<em>Not delivered</em></div>
           ${hasFlag('kossi') ? `<div class="msg out fail">Found a mechanic. Weird place. Everyone is so quiet.<em>Not delivered</em></div>` : ''}
-        </div>`;
+        </div>${hasFlag('msgH') ? `<h4>Unknown number</h4><div class="ph-thread"><div class="msg in">Welcome to Azé-tin… Stay for dinner. — H.</div></div>` : ''}`;
         break;
       case 'recorder':
         html = `${back}<h4>Recorder</h4><p class="ph-empty">Bird calls you hear will be saved here, so you can learn them.</p>`;
@@ -129,6 +208,8 @@ export class Phone {
           : `${back}<h4>Settings</h4>`}
           <label class="ph-range">Mouse sensitivity<input type="range" min="0.3" max="2.5" step="0.05" value="${this.sensitivity}" data-set="sens"></label>
           <label class="ph-range">Volume<input type="range" min="0" max="1" step="0.05" value="${this.volume}" data-set="vol"></label>
+          <label class="ph-range">Brightness<input type="range" min="0.9" max="2.6" step="0.05" value="${this.brightness}" data-set="bright"></label>
+          <label class="ph-check"><input type="checkbox" ${this.marker ? 'checked' : ''} data-set="marker"> Show the objective marker</label>
           <p class="ph-empty">Keys use your keyboard layout: ZQSD (AZERTY) or WASD (QWERTY).</p>
           ${screen === 'pause' ? `<button class="ph-btn ghost" data-act="quit">Save and quit to title</button>` : ''}`;
         break;
@@ -142,6 +223,8 @@ export class Phone {
       inp.addEventListener('input', () => {
         const v = Number(inp.value);
         if (inp.dataset.set === 'sens') { this.sensitivity = v; this.actions.onSensitivity(v); }
+        else if (inp.dataset.set === 'bright') { this.brightness = v; this.actions.onBrightness(v); }
+        else if (inp.dataset.set === 'marker') { this.marker = inp.checked; this.actions.onMarker(inp.checked); }
         else { this.volume = v; this.actions.onVolume(v); }
       }));
   }

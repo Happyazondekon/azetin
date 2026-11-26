@@ -26,6 +26,9 @@ npm run preview  # teste le build
 | Interagir | E |
 | Flash du smartphone | F |
 | Rétroviseur | Clic droit maintenu (après avoir fouillé le coffre) |
+| Frapper | Clic gauche |
+| Clé démonte-roue / cric | 1 / 2 |
+| Se cacher (QTE du hibou) | C maintenu, sans bouger |
 | Smartphone | Tab |
 | Pause | Échap |
 
@@ -47,20 +50,103 @@ npm run preview  # teste le build
 src/
   core/     Game (boucle, états, interactions), Input, Audio
   player/   Contrôleur FPS et collisions
-  world/    Village (blockout) et calques vu / vérité
+  world/    Village, chargement des modèles (Assets.ts), calques vu / vérité
   mirror/   Le rétroviseur
   story/    Compteurs des 4 fins, objectifs, sauvegarde
   ui/       Menu, smartphone, sous-titres
-public/models/  (à venir) exports Blender en .glb
+public/models/  modèles .glb (Blender + repris de Dantokpa Dash)
+tools/blender/  azetin.py (modélisation), lib.py, pack-model.mjs
 ```
 
-## Remplacer les blocs par les modèles Blender
+## Ce qui marche (semaine 2, en cours)
 
-Exporter en **glTF binaire (.glb)** dans `public/models/`, avec compression Meshopt et textures 1024 px max.
-Les personnages ont deux versions : « vue » (calque 1) et « vérité » brûlée (calque 2, visible seulement dans le rétroviseur).
+- Habitants en 3D (corps Quaternius habillés, comme Dantokpa Dash) : Kossi (vivant), Mama Dossi et les villageois (Azévi).
+  Chacun existe en version « vue » et en version « vérité » calcinée, visible seulement dans le rétroviseur.
+- Le hibou : QTE de 3,5 s (se cacher avec C, ou lever le rétroviseur). Raté → un Brûlé surgit derrière Happy.
+- Les Brûlés : ressemblent à des villageois, chassent, frappent ; un coup les fait reculer, trois les font fuir.
+  Ils n'approchent pas du 4×4 (refuge).
+- Combat : clé démonte-roue (rapide) et cric (lent, puissant), endurance.
+- Souffle (vie) sans HUD : bords rouges ; il remonte lentement, vite près du 4×4.
+- Mort : écran de cendre avec une citation selon la cause, puis « Wake up » (dernière sauvegarde).
+
+### Ajouts (26 nov., après-midi)
+
+- **Ciel selon l'heure** (`src/world/Sky.ts`) : coucher de soleil à 19h, crépuscule, nuit avec lune et étoiles, aube vers 5h30.
+  Brouillard et lumières suivent le même horaire. Le menu montre le coucher du soleil.
+- **Torche** : le flash du téléphone (faisceau + halo) baisse avec la batterie, jaunit et vacille sous 15 %.
+- **Voix** (`Audio.babble`) : chaque réplique a sa voix synthétisée (homme, femme, enfant) placée dans l'espace ;
+  les Azévi chuchotent quand Happy passe, et des voix lointaines traversent la nuit. À remplacer par ElevenLabs.
+- **Village peuplé** : une vingtaine d'habitants (debout, assis, accroupis autour du feu de la place), feux et lampes.
+- **Ayaba** : la petite-fille du guérisseur ; dans le rétroviseur elle est noyée (mouillée), pas brûlée. Elle guide Happy jusqu'à Kossi.
+- **Acte 1 jouable de bout en bout** : coffre → Ayaba → Kossi → chambre à air (taxi-moto) → akassa de Mama Dossi
+  (manger : +1 Marque ; refuser) et kit de rustines → machette de Kossi → batterie du générateur à la station (réveille deux Brûlés)
+  → réparation → **Fin I « The Survivor »** au volant du 4×4 (ou **Fin II** si la Marque atteint 3).
+- Choix à deux touches : **E** / **R**. Machette : touche **3**.
+
+### Acte 1 peaufiné (26 nov., soir)
+
+- **Repères** : l'étape en cours reste affichée en haut à gauche (« Step 4 / 11 ») ; un **marqueur** à l'écran
+  montre où aller avec la distance (désactivable dans Réglages) ; le **nom du lieu** s'affiche en arrivant.
+- **Carte évolutive** (touche **M**, ou l'app Map du téléphone) : les lieux et les chemins apparaissent quand on les découvre ;
+  flèche bleue = Happy, anneau orange = objectif.
+- **Notes du téléphone** : les 11 étapes de l'Acte 1, cochées au fur et à mesure, avec un conseil pour l'étape en cours.
+- **Chemins de terre battue** au sol entre les lieux, visibles à la lune et à la torche.
+- **Torche morte** (5 %) : Happy le dit, l'objectif devient « retourne au 4×4 », les warnings orange se voient de loin.
+- **Luminosité** réglable dans Réglages ; nuits un peu plus claires (lune).
+- **Voix** : fragments des vraies voix ElevenLabs de Dantokpa Dash (hommes, femmes, la voix d'Ayaba) découpés et
+  mélangés (`Audio.voiceMix`) — on entend l'accent sans comprendre les mots ; les Azévi parlent voilé, en partie à l'envers, avec écho.
+- **Combat** : les Brûlés prennent leur élan (grognement), frappent, et parfois **attrapent** Happy (marteler **E**).
+  Happy peut frapper tout le monde : un villageois frappé se réveille en Brûlé ; frapper Kossi ou Ayaba fait monter la Marque.
+  Braises à chaque coup, sifflement de l'arme.
+
+## Outil de test
+
+Ou double-clic sur `lancer-jeu.bat`. Ajouter `#at=x,z,orientation` à l'adresse
+(ex. `http://localhost:5173/#at=2,16,0.45`) pour démarrer directement à un endroit du village.
+Ajouter `&truth` montre la « vérité » (comme le rétroviseur) ; `&owl` fait crier le hibou au bout de 4 s.
+
+## Modèles 3D (Blender, même chaîne que Dantokpa Dash)
+
+Les modèles sont construits **par script** avec le module Python de Blender (`pip install bpy`), l'ombre douce
+(occlusion ambiante) est précalculée par Cycles dans la couleur des sommets, puis le `.glb` est compressé (meshopt).
+
+```
+python tools/blender/azetin.py                  # tous les modèles -> tools/blender/work/az-*.glb (+ aperçus .png)
+python tools/blender/azetin.py -- 4x4 station   # seulement certains
+node tools/blender/pack-model.mjs az-4x4 az-station …   # -> public/models/
+```
+
+| Modèle | Contenu |
+| --- | --- |
+| `az-4x4` | 4×4 de location sans marque, pare-buffle, galerie chargée, pneu avant gauche à plat, rétroviseur conducteur arraché |
+| `az-hut-thatch` / `az-hut-tin` / `az-hut-burnt` | cases en banco (paille, tôle ondulée, brûlée) |
+| `az-healer`, `az-asen` | maison de Dah Agossou (signes de kaolin, palissade, canaris) et autel des ancêtres |
+| `az-atelier` | atelier de Kossi : enseigne VULCANISATEUR, pneus, compresseur, établi |
+| `az-buvette` | « Chez Mama Dossi » : auvent, comptoir, bassines d'akassa, marmite sur trois pierres |
+| `az-station` | station de kpayo en ruine : dalle, piliers cassés, auvent effondré, fûts calcinés, arbre mort |
+| `az-stump` | souche de l'iroko Loko, racines-contreforts, tissu blanc noué, offrandes de kaolin |
+| `az-stele`, `az-sign` | stèle des morts et panneau calciné AZÉ-TIN |
+
+Repris de Dantokpa Dash : arbres (`tr-*`), taxi-moto (`ob-zem`), pneus (`ob-tires`), fût, bouteille de gaz,
+générateur, bidons, pirogue (voir `CREDITS.md`). Les personnages auront deux versions : « vue » (calque 1)
+et « vérité » brûlée (calque 2, visible seulement dans le rétroviseur).
 
 ## Rappels jam
 
 - Garder un historique Git depuis le début : l'organisation peut demander l'historique de développement.
 - Aucun compte, aucune pub, aucun paiement, aucun service externe pour démarrer.
 - Déploiement : `npm i -g @opengamehq/cli`, `opengame setup`, `opengame login`, `opengame init`, puis `opengame check --build --json` et `opengame deploy --json`.
+
+## Voix, bruitages et musique (ElevenLabs)
+
+1. Copie `.env.example` en `.env` et mets ta clé : `ELEVENLABS_API_KEY=...` (le fichier `.env` n'est jamais poussé sur GitHub).
+2. Double-clique `generer-voix.bat` (ou `node tools/voices/generate.mjs [lines|sfx|music] [--force]`).
+3. Les fichiers arrivent dans `public/voices/lines/`, `public/sfx/` et `public/music/` ; le jeu les utilise tout seul.
+
+- Répliques et distribution des voix : `src/story/lines.json` (champ `_voices` : nom de la voix dans « Mes voix » ElevenLabs).
+- Bruitages : `tools/voices/sfx.json` (texte décrivant le son, durée, boucle).
+- Sans ces fichiers, le jeu garde ses sons de secours (fragments de voix mélangés, sons synthétisés).
+
+## Mise en scène (passe 5)
+
+Prologue « The Road » (radio, appel à maman, le hibou dans le pare-brise, le pneu qui éclate), cartons d'actes, silhouette au bord de la route, chuchotements à la stèle et Ayaba qui surgit derrière, la place qui se lève, Mama Dossi qui rit dans ton dos, embuscade au zem, SMS de « H. », histoire de Kossi, battement de cœur et nappe sonore, fin de l'Acte 1 (les feux s'éteignent un à un), son d'horreur sur les clics. Espace pour passer une cinématique.

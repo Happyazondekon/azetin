@@ -15,6 +15,9 @@ const PANELS: Record<string, string> = {
   settings: `<h3>Settings</h3><p>Open your phone (Tab) during the game to change settings.</p>`,
   credits: `<h3>Credits</h3><p>A game by <b>Happy Azondekon</b> · HeyHappy Studio</p>
     <p>Made for OpenGame Game Jam #1 · Voices, sound and music: ElevenLabs</p>
+    <p class="small">3D models: HeyHappy Studio (Blender). Generator by KolosStudios (CC BY 3.0, poly.pizza) ·
+    #2 Plastic Canister by hoxsvl (CC BY 4.0, Sketchfab) · Piroga by Alex Martire (CC BY 4.0, Sketchfab) ·
+    Barrel, Gas Tank by Quaternius (CC0) · Characters: Quaternius Universal Base Characters and animations (CC0), MakeHuman hair (CC0), clothes by HeyHappy Studio · three.js (MIT)</p>
     <p class="hint">Azé-tin and its people are fictional.</p>`,
 };
 
@@ -55,7 +58,25 @@ export class Menu {
     });
   }
 
+  // Pendant le chargement : « Searching for network… » et les boutons de partie désactivés
+  setLoading(text: string | null): void {
+    let el = this.root.querySelector<HTMLParagraphElement>('.menu-loading');
+    if (!el) {
+      el = document.createElement('p');
+      el.className = 'menu-loading';
+      this.root.querySelector('nav')!.before(el);
+    }
+    el.textContent = text ?? '';
+    el.style.display = text ? 'block' : 'none';
+    this.root.querySelector<HTMLButtonElement>('[data-a="new"]')!.disabled = !!text;
+    if (text) this.continueBtn.disabled = true;
+    else this.setSave(this.hasSaveNow);
+  }
+
+  private hasSaveNow = false;
+
   setSave(has: boolean): void {
+    this.hasSaveNow = has;
     this.continueBtn.disabled = !has;
   }
 
