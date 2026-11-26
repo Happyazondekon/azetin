@@ -16,6 +16,8 @@ export interface PhoneActions {
   onBrightness(v: number): void;
   onMarker(on: boolean): void;
   onPlay(sound: string): void;
+  onTorch(): void;
+  torch(): { on: boolean; hint: boolean };
   where(): { x: number; z: number; yaw: number; target: { x: number; z: number } | null };
 }
 
@@ -282,6 +284,14 @@ export class Phone {
     g.restore();
   }
 
+  // Commande rapide de la torche (comme sur l'écran de verrouillage d'un vrai smartphone)
+  private torchRow(): string {
+    const t = this.actions.torch();
+    return `<div class="ph-quick"><button class="ph-torch${t.on ? ' on' : ''}${t.hint ? ' hint' : ''}" data-act="torch" aria-label="Torch">
+      <svg viewBox="0 0 24 24"><path d="M8 2.8h8v3.4l-2 3.2v11a1.6 1.6 0 0 1-1.6 1.6h-.8A1.6 1.6 0 0 1 10 20.4v-11L8 6.2z" fill="currentColor"/><rect x="11.2" y="11.6" width="1.6" height="3.2" rx=".8" fill="${t.on ? '#ffd23a' : 'rgba(0,0,0,.45)'}"/></svg></button>
+      <span><b>Torch</b>${t.on ? 'On' : 'Off'}${t.hint ? ' · tap to light the way' : ''}</span></div>`;
+  }
+
   private nav(title: string, back: Screen = 'home', backLabel = 'Back'): string {
     return `<div class="ph-nav"><button class="ph-back" data-go="${back}">${CHEV}<span>${backLabel}</span></button></div><h4>${title}</h4>`;
   }
@@ -301,6 +311,7 @@ export class Phone {
             <div class="ph-w ph-w-clock"><small>Azé-tin</small><b>${clockText()}</b><span>Thursday · Waning moon</span></div>
             <div class="ph-w ph-w-note" data-go="notes"><small>${icon('notes')} Notes</small><b>${step.text}</b></div>
           </div>
+          ${this.torchRow()}
           <div class="ph-grid">${APPS.map(([id, name, ic]) => `<button class="ph-app" data-go="${id}">${icon(ic)}<span>${name}</span>${id === 'photos' && story.secret ? `<em>${story.secret}</em>` : ''}</button>`).join('')}</div>
           <div class="ph-dots"><i class="on"></i><i></i></div>
           <div class="ph-dock">${DOCK.map(([id, ic]) => `<button class="ph-app" data-go="${id}">${icon(ic)}${id === 'messages' ? `<em>${unread}</em>` : id === 'phone' ? '<em>3</em>' : ''}</button>`).join('')}</div>`;
@@ -394,6 +405,7 @@ export class Phone {
     this.body.querySelectorAll<HTMLElement>('[data-photo]').forEach((b) => b.addEventListener('click', () => { this.sel = b.dataset.photo!; this.go('photo'); }));
     this.body.querySelectorAll<HTMLElement>('[data-thread]').forEach((b) => b.addEventListener('click', () => { this.sel = b.dataset.thread!; this.go('thread'); }));
     this.body.querySelectorAll<HTMLElement>('[data-sound]').forEach((b) => b.addEventListener('click', () => this.actions.onPlay(b.dataset.sound!)));
+    this.body.querySelector('[data-act="torch"]')?.addEventListener('click', () => { this.actions.onTorch(); if (this.screen === 'home') this.go('home'); });
     this.body.querySelector('[data-act="resume"]')?.addEventListener('click', () => this.actions.onResume());
     this.body.querySelector('[data-act="quit"]')?.addEventListener('click', () => this.actions.onQuit());
     this.body.querySelectorAll<HTMLInputElement>('input[data-set]').forEach((inp) =>

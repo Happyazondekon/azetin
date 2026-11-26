@@ -308,3 +308,15 @@ canvas.flashback { filter: saturate(0.6) sepia(0.35) contrast(1.15); }
 /* le logo (braises) au menu */
 .menu-logo { display: block; width: min(560px, 46vw); height: auto; margin-left: -14px; filter: drop-shadow(0 0 22px rgba(255,80,0,0.25)); animation: logoflicker 4s infinite; }
 @keyframes logoflicker { 0%, 100% { opacity: 1; } 47% { opacity: 1; } 48% { opacity: 0.82; } 49% { opacity: 1; } 73% { opacity: 0.9; } 74% { opacity: 1; } }
+
+/* torche du smartphone : bouton rond, blanc quand elle est allumée, pulse pendant l'intro */
+.ph-quick { display: flex; align-items: center; gap: 12px; margin: -6px 4px 16px; }
+.ph-torch { width: 54px; height: 54px; border-radius: 50%; border: 0; cursor: pointer; display: grid; place-items: center; color: #fff;
+  background: rgba(60,60,66,0.55); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); transition: background 0.2s, color 0.2s, transform 0.1s; }
+.ph-torch svg { width: 26px; height: 26px; }
+.ph-torch:active { transform: scale(0.92); }
+.ph-torch.on { background: #fff; color: #1c1c1e; box-shadow: 0 0 22px rgba(255,240,200,0.55); }
+.ph-torch.hint { animation: torchpulse 1.3s ease-in-out infinite; }
+@keyframes torchpulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,210,90,0.65); } 50% { box-shadow: 0 0 0 12px rgba(255,210,90,0); } }
+.ph-quick span { display: flex; flex-direction: column; font: 500 11px system-ui; color: rgba(255,255,255,0.65); text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
+.ph-quick b { font: 600 13px system-ui; color: #fff; }

@@ -164,6 +164,8 @@ export class Game {
       onQuit: () => this.quitToTitle(),
       onClose: () => this.togglePhone(),
       onPlay: (snd) => this.audio.sfx(snd, { gain: 0.9 }),
+      onTorch: () => this.toggleTorch(true),
+      torch: () => ({ on: this.flashOn, hint: !hasFlag('torchOn') && hasFlag('intro') }),
       onSensitivity: (v) => (this.player.sensitivity = v),
       onVolume: (v) => this.audio.setVolume(v),
       onBrightness: (v) => (this.renderer.toneMappingExposure = this.exposure = v),
@@ -330,6 +332,19 @@ export class Game {
     this.mode = 'menu';
     document.exitPointerLock();
     this.menu.show(hasSave());
+  }
+
+  // La torche du téléphone : bouton de l'écran d'accueil, ou F en raccourci
+  private toggleTorch(fromPhone: boolean): void {
+    if (story.battery <= 5) { this.line('happy_flash_low', 4); return; }
+    this.flashOn = !this.flashOn;
+    this.audio.ui('click');
+    if (this.flashOn && !hasFlag('torchOn')) {
+      // première fois : la torche s'allume, le téléphone se range tout seul, et on apprend le raccourci
+      setFlag('torchOn');
+      if (fromPhone) setTimeout(() => { if (this.phone.open && this.mode === 'playing') this.togglePhone(); }, 900);
+      setTimeout(() => this.hud.say('[Torch on. Press F to switch it on or off — it drains the battery.]', 6), 1300);
+    }
   }
 
   private togglePhone(): void {
@@ -771,7 +786,7 @@ export class Game {
         // noir complet : le joueur découvre son smartphone, d'abord la torche
         this.flashOn = false;
         setTimeout(() => { this.line('prologue_flat', 5); }, 1800);
-        setTimeout(() => this.hud.say('[Pitch dark. Your phone is in your pocket — press F for the torch.]', 6), 6500);
+        setTimeout(() => this.hud.say('[Pitch dark. You can’t see your own hands. Take out your phone — press Tab.]', 6), 6500);
         this.nextOwl = this.time + 40;
         this.save();
       },
@@ -2431,15 +2446,7 @@ export class Game {
     if (this.input.wasPressed('Tab') && !this.fb) this.togglePhone();
     if (this.input.wasPressed('KeyM')) this.openMap();
     if (this.input.wasPressed('KeyF')) {
-      if (story.battery > 5) {
-        this.flashOn = !this.flashOn;
-        if (this.flashOn && !hasFlag('torchOn')) {
-          setFlag('torchOn');
-          this.audio.ui('click');
-          setTimeout(() => this.phone.notify('phone', 'No signal', 'Searching for network… Press Tab to check your phone.'), 1500);
-        }
-      }
-      else this.line('happy_flash_low', 4);
+      this.toggleTorch(false);
     }
 
     this.player.update(dt, this.input, locked && !this.phone.open && this.rite?.phase !== 3);
