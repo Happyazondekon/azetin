@@ -8,7 +8,8 @@ rem  Usage : double-clic, ou  publier.bat "message de la mise à jour"
 rem =============================================================
 cd /d "%~dp0"
 where git >nul 2>nul || (echo Git n est pas installe : https://git-scm.com & pause & exit /b 1)
-if not exist "node_modules" call npm install
+rem met a jour les dependances (nouvelles bibliotheques de rendu, etc.)
+call npm install --no-audit --no-fund
 echo Verification de la compilation...
 call npm run build
 if errorlevel 1 (

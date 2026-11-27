@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { instance, type Models, type ModelName } from './Assets';
+import { groundMaterial } from './Surfaces';
 import { buildPerson, randomLook, type Person, type PersonDef } from './People';
 import { Sky } from './Sky';
 import { FireSystem, type FireHandle } from './Fire';
@@ -38,7 +39,7 @@ function rng(seed: number) {
 }
 
 const mat = {
-  ground: new THREE.MeshStandardMaterial({ color: 0x2a1d14, roughness: 1 }),
+  ground: groundMaterial(),
   road: new THREE.MeshStandardMaterial({ color: 0x5a2f1c, roughness: 1 }),
   wall: new THREE.MeshStandardMaterial({ color: 0x6e4630, roughness: 0.95 }),
   ash: new THREE.MeshStandardMaterial({ color: 0x1c1a19, roughness: 1 }),

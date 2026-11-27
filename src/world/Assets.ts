@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+import { dress } from './Surfaces';
 
 // Modèles .glb du dossier public/models (faits dans Blender : tools/blender/azetin.py,
 // ou repris de Dantokpa Dash : arbres, taxi-moto, pneus, fûts, générateur, bidons, pirogue).
@@ -47,6 +48,9 @@ export async function loadModels(onProgress: (done: number, total: number) => vo
           const s = mat as THREE.MeshStandardMaterial;
           // La nuit, les textures trop brillantes trahissent le décor : on les mate un peu
           if (s.isMeshStandardMaterial && s.map) s.map.anisotropy = 4;
+          // la peinture du 4×4 est claire : on la baisse pour que les phares et la lune ne la fassent pas éclater en bloom
+          if (name === 'az-4x4' && s.name === 'az_paint') s.color.setScalar(0.55);
+          if (s.isMeshStandardMaterial && name !== 'az-4x4' && !name.startsWith('body') && !name.startsWith('top') && !name.startsWith('bot') && !name.startsWith('hair') && !name.startsWith('shoe')) dress(s);
         }
       });
       out[name] = root;

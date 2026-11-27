@@ -112,8 +112,16 @@ export class Sky {
     scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(0xff8a4a, 0);
     scene.add(this.sun);
-    this.moon = new THREE.DirectionalLight(0x9fb4e0, 0.6);
+    this.moon = new THREE.DirectionalLight(0x8fa8e8, 0.6);
+    // la lune projette des ombres froides (une zone qui suit Happy)
+    this.moon.castShadow = true;
+    const sc = this.moon.shadow.camera;
+    sc.left = -32; sc.right = 32; sc.top = 32; sc.bottom = -32; sc.near = 1; sc.far = 160;
+    this.moon.shadow.bias = -0.0006;
+    this.moon.shadow.normalBias = 0.05;
+    this.moon.shadow.mapSize.set(2048, 2048);
     scene.add(this.moon);
+    scene.add(this.moon.target);
   }
 
   // minutes = heure du jeu (19h = 1140) ; camera = pour garder le ciel centré sur Happy
@@ -153,8 +161,11 @@ export class Sky {
     const k = THREE.MathUtils.clamp((m - 19 * 60) / (7 * 60), 0, 1);
     const ang = 0.15 + k * Math.PI * 0.55;
     const md = this.uniforms.uMoonDir.value.set(Math.cos(ang) * 0.8, Math.sin(ang), -0.45).normalize();
-    this.moon.intensity = lerp(a.moon, b.moon);
-    this.moon.position.copy(md).multiplyScalar(80);
+    this.moon.intensity = lerp(a.moon, b.moon) * 2.4;
+    // la zone d'ombre suit la caméra, alignée sur les texels (pas de scintillement en marchant)
+    const fx = Math.round(camera.position.x / 2) * 2, fz = Math.round(camera.position.z / 2) * 2;
+    this.moon.target.position.set(fx, 0, fz);
+    this.moon.position.set(fx, 0, fz).addScaledVector(md, 80);
 
     // le ciel suit la caméra (il paraît infiniment loin)
     this.dome.position.copy(camera.position);

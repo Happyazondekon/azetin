@@ -16,6 +16,8 @@ export interface PhoneActions {
   onVolume(v: number): void;
   onBrightness(v: number): void;
   onMarker(on: boolean): void;
+  onQuality(q: 'high' | 'medium' | 'low'): void;
+  quality(): 'high' | 'medium' | 'low';
   onPlay(sound: string): void;
   onTorch(): void;
   torch(): { on: boolean; hint: boolean };
@@ -426,6 +428,7 @@ export class Phone {
             <label class="ph-row ph-range"><span>${tr('Volume')}</span><input type="range" min="0" max="1" step="0.05" value="${this.volume}" data-set="vol"></label>
             <label class="ph-row ph-range"><span>${tr('Brightness')}</span><input type="range" min="0.9" max="2.6" step="0.05" value="${this.brightness}" data-set="bright"></label>
             <label class="ph-row ph-toggle"><span>${tr('Objective marker')}</span><input type="checkbox" ${this.marker ? 'checked' : ''} data-set="marker"><i></i></label>
+            <div class="ph-row ph-lang"><span>${tr('Graphics')}</span><span class="ph-seg">${(['low', 'medium', 'high'] as const).map((q) => `<button data-q="${q}" class="${this.actions.quality() === q ? 'on' : ''}">${tr(q === 'high' ? 'High' : q === 'medium' ? 'Medium' : 'Low')}</button>`).join('')}</span></div>
             <div class="ph-row ph-lang"><span>${tr('Language')}</span><span class="ph-seg"><button data-lang="en" class="${lang() === 'en' ? 'on' : ''}">EN</button><button data-lang="fr" class="${lang() === 'fr' ? 'on' : ''}">FR</button></span></div>
           </div>
           <p class="ph-empty">${tr('Voices stay in English.')} ${tr('Keys follow your keyboard: ZQSD (AZERTY) or WASD (QWERTY). Kaolin: A (AZERTY) / Q (QWERTY).')}</p>
@@ -439,6 +442,7 @@ export class Phone {
     this.body.querySelectorAll<HTMLElement>('[data-thread]').forEach((b) => b.addEventListener('click', () => { this.sel = b.dataset.thread!; this.go('thread'); }));
     this.body.querySelectorAll<HTMLElement>('[data-sound]').forEach((b) => b.addEventListener('click', () => this.actions.onPlay(b.dataset.sound!)));
     this.body.querySelector('[data-act="torch"]')?.addEventListener('click', () => { this.actions.onTorch(); if (this.screen === 'home') this.go('home'); });
+    this.body.querySelectorAll<HTMLElement>('[data-q]').forEach((b) => b.addEventListener('click', () => { this.actions.onQuality(b.dataset.q as 'high' | 'medium' | 'low'); this.go(this.screen); }));
     this.body.querySelectorAll<HTMLElement>('[data-lang]').forEach((b) => b.addEventListener('click', () => { setLang(b.dataset.lang as 'en' | 'fr'); this.go(this.screen); }));
     this.body.querySelector('[data-act="resume"]')?.addEventListener('click', () => this.actions.onResume());
     this.body.querySelector('[data-act="quit"]')?.addEventListener('click', () => this.actions.onQuit());

@@ -23,6 +23,7 @@ import { Credits } from '../ui/Credits';
 import { LAYER_SEEN, LAYER_TRUTH } from '../world/Village';
 import LINES from '../story/lines.json';
 import { tr, lang } from '../story/i18n';
+import { Look, savedQuality, type Quality } from './Look';
 import { buildPerson, randomLook, type Person } from '../world/People';
 import { story, resetStory, loadGame, saveGame, hasSave, hasFlag, setFlag, clearSave } from '../story/State';
 
@@ -47,6 +48,8 @@ function w_embers(world: World, pos: THREE.Vector3): void {
 }
 
 export class Game {
+  private look!: Look;
+  private rawLook = location.hash.includes('nolook'); // outil de test : l'image sans les effets
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(70, 1, 0.05, 220);
@@ -118,6 +121,7 @@ export class Game {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     root.appendChild(this.renderer.domElement);
+    this.look = new Look(this.renderer, this.scene, this.camera, savedQuality());
 
     // La caméra principale voit le décor (0) et l'apparence "vue" des personnages (1)
     // (outil de test : #truth dans l'adresse montre la « vérité », comme dans le rétroviseur)
@@ -175,6 +179,8 @@ export class Game {
       onVolume: (v) => this.audio.setVolume(v),
       onBrightness: (v) => (this.renderer.toneMappingExposure = this.exposure = v),
       onMarker: (on) => (this.markerOn = on),
+      onQuality: (q) => this.setQuality(q),
+      quality: () => this.look.quality,
       where: () => ({ x: this.player.pos.x, z: this.player.pos.z, yaw: this.player.yaw, target: this.target() }),
     });
     this.phone.onViewerClose = () => this.afterViewer();
@@ -200,6 +206,7 @@ export class Game {
     const models = await loadModels((d, t) => this.menu.setLoading(`Searching for network… ${Math.round((d / t) * 100)}%`));
     this.models = models;
     this.world = buildVillage(this.scene, models);
+    this.setQuality(this.look.quality); // la taille de l'ombre de la lune suit la qualité choisie
     this.buildFigure();
     const a2 = buildAct2Props(this.scene, this.world.fx);
     this.pickups = a2.pickups;
@@ -2720,8 +2727,14 @@ export class Game {
     this.audio.update();
 
     if (this.creditsOn) return;
-    this.renderer.render(this.scene, this.camera);
-    if (this.mode === 'playing') this.mirror.render(this.renderer, this.scene);
+    if (this.rawLook) { this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.render(this.scene, this.camera); this.renderer.toneMapping = THREE.NoToneMapping; }
+    else this.look.render(dt);
+    if (this.mode === 'playing' && this.mirror.raised >= 0.02) {
+      // le cadre du rétroviseur est dessiné directement à l'écran : il garde son propre rendu de tons
+      this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      this.mirror.render(this.renderer, this.scene);
+      this.renderer.toneMapping = THREE.NoToneMapping;
+    }
     if (this.mode === 'dead') this.camera.position.y = Math.max(0.35, this.camera.position.y - dt * 1.2); // Happy s'effondre
     this.input.endFrame();
   }
@@ -2731,6 +2744,13 @@ export class Game {
   private perfAcc = 0;
   private perfN = 0;
   private pixelRatio = Math.min(devicePixelRatio, 1.5);
+  private setQuality(q: Quality): void {
+    this.look.setQuality(q);
+    const size = q === 'high' ? 2048 : q === 'medium' ? 1024 : 512;
+    const m = this.world?.sky.moon;
+    if (m && m.shadow.mapSize.x !== size) { m.shadow.mapSize.set(size, size); m.shadow.map?.dispose(); m.shadow.map = null; }
+  }
+
   private adaptQuality(dt: number): void {
     if (this.mode !== 'playing' && this.mode !== 'cine') return;
     this.perfAcc += dt;
@@ -2749,10 +2769,16 @@ export class Game {
       this.flash.shadow.map?.dispose();
       this.flash.shadow.map = null;
     }
+    // l'ordinateur peine encore à la plus petite résolution : on retire un cran d'effets (sans l'enregistrer)
+    if (mean > 1 / 24 && pr <= 0.75 && this.look.quality !== 'low') {
+      this.look.setQuality(this.look.quality === 'high' ? 'medium' : 'low', false);
+      pr = Math.min(max, pr + 0.15);
+    }
     if (pr !== this.pixelRatio) {
       this.pixelRatio = pr;
       this.renderer.setPixelRatio(pr);
       this.renderer.setSize(innerWidth, innerHeight);
+      this.look.setSize(innerWidth, innerHeight);
     }
   }
 
@@ -2813,11 +2839,13 @@ export class Game {
       this.renderer.setRenderTarget(this.warmRT);
       this.renderer.render(this.scene, this.camera);
       this.renderer.setRenderTarget(null);
-      this.renderer.render(this.scene, this.camera);
+      this.look.render(0);
       // le rétroviseur : sa propre cible de rendu et son cadre par-dessus l'écran
       const r = this.mirror.raised;
       this.mirror.raised = 1;
+      this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
       this.mirror.render(this.renderer, this.scene);
+      this.renderer.toneMapping = THREE.NoToneMapping;
       this.mirror.raised = r;
     } catch { /* pas grave */ }
     for (const o of shown) o.visible = false;
@@ -3136,6 +3164,7 @@ export class Game {
   private resize(): void {
     const w = innerWidth, h = innerHeight;
     this.renderer.setSize(w, h);
+    this.look.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.mirror.resize(w / h);
