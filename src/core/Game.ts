@@ -1052,6 +1052,8 @@ export class Game {
     const fireD = Math.hypot(pos.x - w.fires[0].x, pos.z - w.fires[0].z);
     this.audio.loop('fire', w.flameScale[0] * Math.max(0, 1 - fireD / 12) * 0.7);
     this.audio.loop('drone', 0.12 + story.pieces * 0.06 + (hasFlag('act1') ? 0.1 : 0));
+    // la nuit d'Azé-tin : la cloche, le vent, le tambour qui bat (dès l'Acte II, plus fort après minuit)
+    this.audio.loop('nightmusic', hasFlag('ended') || this.rite ? 0 : hasFlag('act2') ? 0.3 : hasFlag('act1') ? 0.18 : 0.08, 'music/night.mp3');
     let close = 99;
     for (const e of this.enemies.list) close = Math.min(close, e.pos.distanceTo(pos));
     const heart = Math.max(close < 14 ? 1 - close / 14 : 0, story.souffle < 50 ? (50 - story.souffle) / 50 : 0);
@@ -1993,6 +1995,8 @@ export class Game {
   private async finalScreen(title: string, lines: string[], dawn = false, restart = false): Promise<void> {
     setFlag('ended');
     clearSave();
+    this.audio.loop('nightmusic', 0, 'music/night.mp3');
+    this.audio.loop('tension', 0, 'music/tension.mp3');
     this.mode = 'cine';
     this.hud.hideAll();
     this.hud.setKaolin(null);
@@ -2238,8 +2242,10 @@ export class Game {
     const beats: Beat[] = [
       { d: 9.5, enter: () => {
         this.director.title('THE RITE', 'ACT III — THE LAST HEALER', 4.5);
-        this.audio.loop('rite_drums', 0.7);
-        this.audio.loop('rite', 0.5, 'music/rite.mp3');
+        this.audio.loop('rite_drums', 0.3);
+        this.audio.loop('rite', 0.8, 'music/rite.mp3');
+        this.audio.loop('nightmusic', 0, 'music/night.mp3');
+        this.audio.loop('tension', 0, 'music/tension.mp3');
         this.audio.loop('drone', 0);
         this.line('agossou_rite', 9);
         for (const [i, id] of ['liana', 'ash', 'flower'].entries()) { const pk = this.pickups.find((x) => x.id === id); if (pk) sprout(pk.obj, i); }
