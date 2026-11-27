@@ -453,7 +453,8 @@ export class Game {
     const name = who === 'happy' ? 'Happy' : who === 'kossi' ? 'Kossi' : who === 'dossi' ? 'Mama Dossi' : who === 'ayaba' ? 'Ayaba' : who === 'radio' ? 'Radio' : who === 'agossou' ? 'Dah Agossou' : who === 'houngbo' ? 'Houngbo' : /^v\d/.test(who) ? 'A villager' : '';
     this.subtitles(name, shown, seconds);
     const d = p ? p.root.position.distanceTo(this.player.pos) : 0;
-    const gain = who === 'happy' ? 0.9 : who === 'radio' ? 0.7 : Math.max(0.3, 1 - d / 18);
+    const gain = who === 'happy' ? 1.1 : who === 'radio' ? 0.8 : Math.max(1.0, 1.6 - d / 25) * (p?.def.azevi ? 1.25 : 1);
+    this.talkUntil = this.time + seconds; // la musique se baisse pendant qu'on parle
     const pan = p ? this.panOf(p.root.position) : 0;
     const fallback = () => {
       if (who === 'happy') this.audio.voiceMix(text, 'm', { gain: 0.55, rate: 1.04 });
@@ -1059,13 +1060,16 @@ export class Game {
     const fireD = Math.hypot(pos.x - w.fires[0].x, pos.z - w.fires[0].z);
     this.audio.loop('fire', w.flameScale[0] * Math.max(0, 1 - fireD / 12) * 0.7);
     this.audio.loop('drone', 0.12 + story.pieces * 0.06 + (hasFlag('act1') ? 0.1 : 0));
-    // la nuit d'Azé-tin : la cloche, le vent, le tambour qui bat (dès l'Acte II, plus fort après minuit)
-    this.audio.loop('nightmusic', hasFlag('ended') || this.rite ? 0 : hasFlag('act2') ? 0.55 : hasFlag('act1') ? 0.4 : 0.22, 'music/night.mp3');
+    // la musique d'Azé-tin tourne pendant tout le jeu (baissée quand quelqu'un parle, coupée pendant le rite et le souvenir)
+    const talk = this.time < this.talkUntil ? 0.45 : 1;
+    const music = hasFlag('ended') || this.rite || this.fb ? 0 : (hasFlag('act2') ? 0.85 : 0.7) * talk;
+    this.audio.loop('ingame', music, 'music/theme.mp3');
+    this.audio.loop('nightmusic', 0, 'music/night.mp3');
     let close = 99;
     for (const e of this.enemies.list) close = Math.min(close, e.pos.distanceTo(pos));
     const heart = Math.max(close < 14 ? 1 - close / 14 : 0, story.souffle < 50 ? (50 - story.souffle) / 50 : 0);
     this.audio.loop('heartbeat', heart * 0.9);
-    this.audio.loop('tension', close < 14 ? 0.6 : 0, 'music/tension.mp3');
+    this.audio.loop('tension', close < 14 && !this.fb ? 0.45 : 0, 'music/tension.mp3');
   }
 
   // ================================================================ ACTE II — LA STATION
@@ -1351,6 +1355,8 @@ export class Game {
     if (this.mode !== 'playing' || this.fb) { if (!hasFlag('flashback')) setTimeout(() => this.startFlashback(), 3000); return; }
     setFlag('flashback');
     this.save();
+    this.audio.loop('ingame', 0, 'music/theme.mp3');
+    this.audio.loop('tension', 0, 'music/tension.mp3');
     this.director.fadeTo(1, 1.2);
     this.audio.sfx('stinger3', { gain: 0.6 });
     setTimeout(() => {
@@ -1913,6 +1919,7 @@ export class Game {
 
   // ---------------------------------------------------------------- choix III : brûler la maison du guérisseur
   private burnWarned = false;
+  private talkUntil = 0;
   private burnHouse(): void {
     if (this.choice || this.burnWarned) return;
     // la voix du guérisseur s'élève de sa maison : un dernier avertissement avant le choix
@@ -2005,6 +2012,7 @@ export class Game {
     this.hud.hideAll();
     this.hud.setKaolin(null);
     this.audio.loop('nightmusic', 0, 'music/night.mp3');
+    this.audio.loop('ingame', 0, 'music/theme.mp3');
     this.audio.loop('credits', 0.85, dawn ? 'music/dawn.mp3' : 'music/theme.mp3');
     this.creditsOn = true; // le village 3D n'est plus dessiné derrière le générique
     await new Credits().play(dawn, last);
@@ -2035,6 +2043,7 @@ export class Game {
     setFlag('ended');
     clearSave();
     this.audio.loop('nightmusic', 0, 'music/night.mp3');
+    this.audio.loop('ingame', 0, 'music/theme.mp3');
     this.audio.loop('tension', 0, 'music/tension.mp3');
     this.mode = 'cine';
     this.hud.hideAll();
@@ -2287,6 +2296,7 @@ export class Game {
         this.audio.loop('rite_drums', 0.3);
         this.audio.loop('rite', 0.8, 'music/rite.mp3');
         this.audio.loop('nightmusic', 0, 'music/night.mp3');
+        this.audio.loop('ingame', 0, 'music/theme.mp3');
         this.audio.loop('tension', 0, 'music/tension.mp3');
         this.audio.loop('drone', 0);
         this.line('agossou_rite', 9);

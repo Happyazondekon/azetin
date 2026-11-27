@@ -247,11 +247,11 @@ export class Audio {
       f.connect(g);
       return f;
     }
-    f.type = 'lowpass'; f.frequency.value = 2600;
+    f.type = 'lowpass'; f.frequency.value = 5200;
     const d = ctx.createDelay(1);
     d.delayTime.value = 0.21;
     const fb = ctx.createGain();
-    fb.gain.value = 0.3;
+    fb.gain.value = 0.22;
     f.connect(g);
     f.connect(d).connect(fb).connect(d);
     fb.connect(g);
