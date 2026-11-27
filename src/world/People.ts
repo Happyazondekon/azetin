@@ -103,6 +103,28 @@ export interface Person {
 }
 
 // ---------------------------------------------------------------- textures
+// Relief de trame (commun à tous les tissus) : fils croisés en léger relief
+let weaveNrm: THREE.DataTexture | null = null;
+function weaveNormal(): THREE.DataTexture {
+  if (weaveNrm) return weaveNrm;
+  const n = 64, d = new Uint8Array(n * n * 4);
+  const h = (x: number, y: number) => {
+    const u = ((x % 8) + 8) % 8, v = ((y % 8) + 8) % 8;
+    const warp = Math.sin((u / 8) * Math.PI) * (((y >> 3) + (x >> 3)) & 1 ? 1 : 0.4);
+    const weft = Math.sin((v / 8) * Math.PI) * (((y >> 3) + (x >> 3)) & 1 ? 0.4 : 1);
+    return Math.max(warp, weft);
+  };
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const dx = h(x + 1, y) - h(x - 1, y), dy = h(x, y + 1) - h(x, y - 1);
+    const i = (y * n + x) * 4;
+    d[i] = 128 - dx * 50; d[i + 1] = 128 - dy * 50; d[i + 2] = 255; d[i + 3] = 255;
+  }
+  weaveNrm = new THREE.DataTexture(d, n, n);
+  weaveNrm.wrapS = weaveNrm.wrapT = THREE.RepeatWrapping;
+  weaveNrm.repeat.set(40, 40);
+  weaveNrm.needsUpdate = true;
+  return weaveNrm;
+}
 const waxCache = new Map<string, THREE.Texture>();
 // Six motifs de tissu : ronds-losanges (wax), rayures, kente, feuilles, cercles concentriques, damier bogolan
 function waxTexture(c: [string, string, string], pattern?: number): THREE.Texture {
@@ -111,8 +133,9 @@ function waxTexture(c: [string, string, string], pattern?: number): THREE.Textur
   const hit = waxCache.get(key);
   if (hit) return hit;
   const cv = document.createElement('canvas');
-  cv.width = cv.height = 128;
+  cv.width = cv.height = 256;
   const g = cv.getContext('2d')!;
+  g.scale(2, 2); // motif dessiné en 128, rendu en 256 (le grain du tissu est ajouté ensuite)
   g.fillStyle = c[0];
   g.fillRect(0, 0, 128, 128);
   const cells = (f: (x: number, y: number, i: number) => void) => { let i = 0; for (let y = 0; y < 128; y += 32) for (let x = 0; x < 128; x += 32) f(x, y, i++); };
@@ -148,10 +171,27 @@ function waxTexture(c: [string, string, string], pattern?: number): THREE.Textur
       for (let k = 0; k < 3; k++) g.fillRect(x + 6 + k * 9, y + 6, 3, 20);
     });
   }
+  // Tissu porté : trame croisée, couleurs un peu passées au soleil, usure irrégulière
+  const img = g.getImageData(0, 0, 256, 256), d = img.data;
+  let seed = key.length * 977 + pat * 131;
+  const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const blot = new Float32Array(17 * 17).map(() => rnd());
+  for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) {
+    const i = (y * 256 + x) * 4;
+    const weave = ((x + (y >> 1)) & 1 ? 0.93 : 1.0) * ((y + (x >> 1)) & 1 ? 0.95 : 1.0);
+    const bx = x / 16, by = y / 16, x0 = bx | 0, y0 = by | 0, fx = bx - x0, fy = by - y0;
+    const b = blot[y0 * 17 + x0] * (1 - fx) * (1 - fy) + blot[y0 * 17 + x0 + 1] * fx * (1 - fy) + blot[(y0 + 1) * 17 + x0] * (1 - fx) * fy + blot[(y0 + 1) * 17 + x0 + 1] * fx * fy;
+    const fade = 0.86 + 0.14 * b, grain = 0.94 + 0.12 * rnd();
+    const r = d[i], gg = d[i + 1], bb = d[i + 2], l = 0.3 * r + 0.59 * gg + 0.11 * bb;
+    const k = weave * fade * grain * 0.9; // un peu plus sombre : le wax ne doit pas « brûler » sous la torche
+    d[i] = (r * 0.82 + l * 0.18) * k; d[i + 1] = (gg * 0.82 + l * 0.18) * k; d[i + 2] = (bb * 0.82 + l * 0.18) * k;
+  }
+  g.putImageData(img, 0, 0);
   const t = new THREE.CanvasTexture(cv);
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(3.2, 3.2);
+  t.anisotropy = 4;
   waxCache.set(key, t);
   return t;
 }
@@ -325,8 +365,15 @@ function buildBody(models: Models, def: PersonDef, truth: boolean): { holder: TH
     const o2 = over();
     if (o2) { m.material = o2; return; }
     const mat = (m.material as THREE.MeshStandardMaterial).clone();
-    if (m === body) mat.color.set(def.skin);
+    if (m === body) {
+      // peau : teinte du personnage, un léger satin (la peau renvoie un peu la lumière), relief plus marqué
+      mat.color.set(def.skin).multiplyScalar(1.12);
+      mat.roughness = 0.66;
+      mat.metalness = 0;
+      mat.normalScale?.set(1.3, 1.3);
+    }
     else if (/brow/i.test(m.name)) mat.color.set(def.hairColor ?? '#1d1410');
+    else if (/eye/i.test(mat.name || m.name)) { mat.color.setScalar(0.2); mat.roughness = 0.55; } // yeux : le blanc ne doit pas luire sous la torche
     m.material = mat;
   });
   // chaque visage est différent : nez, lèvres, mâchoire
@@ -349,13 +396,13 @@ function buildBody(models: Models, def: PersonDef, truth: boolean): { holder: TH
       body.parent!.add(sm);
     }
   };
-  const cloth = () => new THREE.MeshStandardMaterial({ map: waxTexture(def.wax, def.pattern), roughness: 0.85, side: THREE.DoubleSide });
+  const cloth = () => new THREE.MeshStandardMaterial({ map: waxTexture(def.wax, def.pattern), normalMap: weaveNormal(), normalScale: new THREE.Vector2(0.6, 0.6), roughness: 0.92, side: THREE.DoubleSide });
   if (def.sex === 'f' && def.top !== 'robe') attach('bot-pagne-f', cloth);
   if (def.sex === 'm' && body) {
     // pantalon de toile (les hommes ne portent pas le pagne au quotidien)
     const sc = new THREE.Vector3();
     body.getWorldScale(sc);
-    const pants = new THREE.SkinnedMesh(legShell(body, 0.014 / (sc.y || 1), def.id), over() ?? new THREE.MeshStandardMaterial({ color: def.pants ?? '#2f2a24', roughness: 0.9 }));
+    const pants = new THREE.SkinnedMesh(legShell(body, 0.014 / (sc.y || 1), def.id), over() ?? new THREE.MeshStandardMaterial({ color: def.pants ?? '#2f2a24', roughness: 0.95, normalMap: weaveNormal(), normalScale: new THREE.Vector2(0.5, 0.5) }));
     pants.bind(body.skeleton, body.bindMatrix);
     pants.frustumCulled = false;
     body.parent!.add(pants);
@@ -364,12 +411,12 @@ function buildBody(models: Models, def: PersonDef, truth: boolean): { holder: TH
   const hc = def.hairColor ?? '#1d1410';
   const hair = def.hair && (HAIR_OK[def.sex].includes(def.hair) ? def.hair : HAIR_OK[def.sex][0]);
   // cheveux mats (sous la torche, des cheveux brillants paraissent gris)
-  const hairMat = (m: THREE.MeshStandardMaterial) => { const c = m.clone(); c.color.set(hc).multiplyScalar(def.hairColor ? 0.8 : 0.35); c.roughness = 1; c.alphaTest = 0.35; c.transparent = false; return c; };
+  const hairMat = (m: THREE.MeshStandardMaterial) => { const c = m.clone(); c.color.set(hc).multiplyScalar(def.hairColor ? 0.7 : 0.25); c.roughness = 1; c.alphaTest = 0.35; c.transparent = false; return c; };
   if (hair) attach(`hair-${hair}-${def.sex}`, hairMat);
   if (hair && body) {
     const sc = new THREE.Vector3();
     body.getWorldScale(sc);
-    const cap = new THREE.SkinnedMesh(capShell(body, 0.0015 / (sc.y || 1), def.sex), over() ?? new THREE.MeshStandardMaterial({ color: def.hairColor ? new THREE.Color('#24180f') : new THREE.Color(hc).multiplyScalar(0.35), roughness: 1 }));
+    const cap = new THREE.SkinnedMesh(capShell(body, 0.0015 / (sc.y || 1), def.sex), over() ?? new THREE.MeshStandardMaterial({ color: def.hairColor ? new THREE.Color('#24180f') : new THREE.Color(hc).multiplyScalar(0.22), roughness: 1, normalMap: weaveNormal(), normalScale: new THREE.Vector2(1.2, 1.2) }));
     cap.bind(body.skeleton, body.bindMatrix);
     cap.frustumCulled = false;
     body.parent!.add(cap);

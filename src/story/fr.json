@@ -11,7 +11,7 @@
 "Patch kit": "Kit de rustines",
 "Battery": "Batterie",
 "Calabash (kaolin)": "Calebasse (kaolin)",
-"[Torch on. Press F to switch it on or off — it drains the battery.]": "[Torche allumée. F pour l'allumer ou l'éteindre — elle vide la batterie.]",
+"[Torch on. Press F to switch it on or off — it drains the battery.]": "[Torche allumée. Appuie sur F pour l'allumer ou l'éteindre — elle vide la batterie.]",
 "ACT III — The healer. Gather the 3 plants, find the whole truth (5 fragments), then begin the rite at the asen under the station.": "ACTE III — Le guérisseur. Rassemble les 3 plantes, trouve toute la vérité (5 fragments), puis commence le rite à l'asen sous la station.",
 "an inner tube (the old moto-taxi, west)": "une chambre à air (le vieux zémidjan, à l'ouest)",
 "a patch kit (Mama Dossi’s stall)": "un kit de rustines (l'étal de Mama Dossi)",
@@ -387,5 +387,11 @@
 "Graphics": "Graphismes",
 "High": "Haute",
 "Medium": "Moyenne",
-"Low": "Basse"
+"Low": "Basse",
+"Tab phone · M map · F torch · V camera · Right click mirror": "Tab téléphone · M carte · F torche · V appareil photo · Clic droit rétroviseur",
+"Hold V to raise the camera": "Maintiens V pour lever l'appareil photo",
+"If the mirror shows the truth… maybe my phone’s camera does too. — Hold V to look through it.": "Si le rétroviseur montre la vérité… peut-être que l'appareil photo de mon téléphone aussi. — Maintiens V pour regarder à travers.",
+"Through the lens, the village is not what it seems…": "À travers l'objectif, le village n'est pas ce qu'il paraît…",
+"[It turns its burnt face away from the flash]": "[Il détourne son visage brûlé du flash]",
+"Through the camera (hold V), white prints glow in the dust. Someone walked to every piece of the truth.": "À travers l'appareil photo (maintiens V), des empreintes blanches brillent dans la poussière. Quelqu'un a marché jusqu'à chaque morceau de vérité."
 }

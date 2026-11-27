@@ -80,6 +80,15 @@ export class Game {
   private choice: { a: string; onA: () => void; b: string; onB: () => void } | null = null;
   private nextMurmur = 0;
   private fill!: THREE.SpotLight;
+  private nearT = 0; private nearD = 8; private nearK = 1;
+  // Viseur de l'appareil photo (maintenir V) : l'objectif voit ce que l'œil ne voit pas
+  private lens = 0;                       // 0 = baissé, 1 = levé
+  private lensTruth = false;
+  private lensMask = 0;
+  private lensEl!: HTMLDivElement;
+  private lensT = 0;
+  private traces: { pk: Pickup; group: THREE.Group }[] = [];
+  private nearRay = new THREE.Ray(); private tmpA = new THREE.Vector3(); private tmpB = new THREE.Vector3(); private tmpC = new THREE.Vector3();
   private sparks: Sparks;
   private grab: { e: Enemy; presses: number; t: number } | null = null;
   private markerOn = true;
@@ -154,6 +163,10 @@ export class Game {
     this.scareEl.className = 'scareflash';
     root.appendChild(this.scareEl);
     this.camFlashEl = document.createElement('div');
+    this.lensEl = document.createElement('div');
+    this.lensEl.className = 'lens';
+    this.lensEl.innerHTML = '<i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i><div class="l-top"><span class="rec">● REC</span><span class="l-time">00:00</span></div><div class="l-bot"><span class="l-bat"></span><span class="l-zoom">1.4×</span></div><div class="l-cross"></div>';
+    document.body.appendChild(this.lensEl);
     this.camFlashEl.className = 'camflash';
     root.appendChild(this.camFlashEl);
     // Un son d'horreur sur chaque bouton du jeu (menu, téléphone, écrans de fin)
@@ -210,6 +223,7 @@ export class Game {
     this.buildFigure();
     const a2 = buildAct2Props(this.scene, this.world.fx);
     this.pickups = a2.pickups;
+    this.buildTraces();
     this.hornbill = a2.hornbill;
     this.kaolinFx = new Sparks(this.scene, 'kaolin');
     this.houngbo = buildPerson(models, { id: 'houngbo', sex: 'm', height: 1.93, skin: '#4a3224', top: 'robe', wax: ['#6a1a5a', '#c8a030', '#2a0e24'], shoe: 'babouche', shoeColor: ['#e0a526', '#7b2cbf'],
@@ -1101,6 +1115,10 @@ export class Game {
       pk.obj.visible = this.pickupOpen(pk) && !taken;
       pk.glow.intensity = pk.obj.visible ? 1.4 : 0;
     }
+    if (hasFlag('calabash') && hasFlag('sawDossi') && !hasFlag('traceHint') && this.mode === 'playing' && !this.fb) {
+      setFlag('traceHint');
+      setTimeout(() => this.hud.say('Through the camera (hold V), white prints glow in the dust. Someone walked to every piece of the truth.', 7), 6000);
+    }
     if (hasFlag('agossou') && !this.hornbill.visible && this.mode === 'playing') {
       this.spiritLight();
       this.hornbill.position.set(0.2, 2.1, -20.4);
@@ -1242,6 +1260,100 @@ export class Game {
   private spiritLight(): void {
     if (this.spirit) return;
     this.spirit = this.world.fx.addGlow(new THREE.Vector3(0, 3.2, -19.2), 0xc8dcff, 6, 9);
+  }
+
+  // Traces de kaolin (mains, pieds nus) visibles seulement à travers l'appareil photo :
+  // elles mènent de la place jusqu'à chaque fragment ou plante encore à trouver.
+  private buildTraces(): void {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 64;
+    const g = cv.getContext('2d')!;
+    const grd = g.createRadialGradient(32, 38, 2, 32, 38, 22);
+    grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grd;
+    g.beginPath(); g.ellipse(32, 40, 12, 18, 0, 0, Math.PI * 2); g.fill(); // plante du pied
+    for (const [x, y, r] of [[22, 16, 4], [29, 12, 4.2], [36, 12, 3.8], [42, 15, 3.4], [46, 20, 3]] as const) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
+    const tex = new THREE.CanvasTexture(cv);
+    const mat = new THREE.MeshBasicMaterial({ map: tex, color: 0xd8ecff, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
+    const geo = new THREE.PlaneGeometry(0.3, 0.4);
+    geo.rotateX(-Math.PI / 2);
+    for (const pk of this.pickups) {
+      if (pk.kind === 'calabash') continue;
+      const group = new THREE.Group();
+      const to = pk.pos.clone().setY(0);
+      const from = new THREE.Vector3(0, 0, 4); // la place du village
+      const dir = to.clone().sub(from);
+      const len = dir.length();
+      dir.normalize();
+      const side = new THREE.Vector3(-dir.z, 0, dir.x);
+      const n = Math.min(40, Math.floor(len / 0.75));
+      for (let k = 0; k < n; k++) {
+        const t = (k + 1) / (n + 1);
+        const m = new THREE.Mesh(geo, mat);
+        const wob = Math.sin(k * 0.7 + to.x) * 0.6;
+        m.position.copy(from).addScaledVector(dir, len * t).addScaledVector(side, (k % 2 ? 0.14 : -0.14) + wob);
+        m.position.y = 0.06;
+        m.rotation.y = Math.atan2(dir.x, dir.z) + (k % 2 ? 0.12 : -0.12);
+        if (k % 2) m.scale.x = -1;
+        m.layers.set(LAYER_TRUTH);
+        group.add(m);
+      }
+      group.visible = false;
+      this.scene.add(group);
+      this.traces.push({ pk, group });
+    }
+  }
+
+  // Le viseur : maintenir V. Après le rétroviseur, Happy comprend que l'objectif voit aussi la vérité.
+  private updateLens(dt: number, locked: boolean): void {
+    const can = this.mode === 'playing' && locked && !this.phone.open && !this.fb && !this.qte && !this.grab && hasFlag('phoneOpened') && story.battery > 5 && this.mirror.raised < 0.05;
+    const want = can && this.input.down('KeyV');
+    this.lens += ((want ? 1 : 0) - this.lens) * Math.min(1, dt * 10);
+    if (!want && this.lens < 0.01) this.lens = 0;
+    const up = this.lens > 0.5;
+    const truth = up && hasFlag('sawDossi');
+    if (truth !== this.lensTruth) {
+      if (truth) { this.lensMask = this.camera.layers.mask; this.camera.layers.enable(LAYER_TRUTH); this.camera.layers.disable(LAYER_SEEN); }
+      else if (this.lensMask) this.camera.layers.mask = this.lensMask;
+      this.lensTruth = truth;
+    }
+    const z = 1 + 0.4 * this.lens;
+    if (Math.abs(this.camera.zoom - z) > 0.001) { this.camera.zoom = z; this.camera.updateProjectionMatrix(); }
+    this.viewmodel.group.visible = this.lens < 0.3;
+    this.lensEl.classList.toggle('on', this.lens > 0.05);
+    this.lensEl.style.opacity = String(this.lens);
+    document.body.classList.toggle('lens-up', up);
+    for (const t of this.traces) t.group.visible = t.pk.obj.visible;
+    if (this.lens <= 0) { this.lensT = 0; return; }
+    this.lensT += dt;
+    story.battery = Math.max(0, story.battery - 0.18 * dt);
+    const s = Math.floor(this.lensT);
+    (this.lensEl.querySelector('.l-time') as HTMLElement).textContent = `00:${String(s % 60).padStart(2, '0')}`;
+    (this.lensEl.querySelector('.l-bat') as HTMLElement).textContent = `▮ ${Math.round(story.battery)}%`;
+    if (up && !hasFlag('lensUsed')) {
+      setFlag('lensUsed');
+      if (hasFlag('sawDossi')) this.hud.say('Through the lens, the village is not what it seems…', 5);
+    }
+    // déclencheur : clic gauche = photo ; un fragment proche se photographie ainsi aussi
+    if (up && this.input.leftClicked) {
+      this.camFlash();
+      story.battery = Math.max(0, story.battery - 0.5);
+      const near = this.pickups.find((pk) => pk.kind === 'fragment' && pk.obj.visible && pk.pos.distanceTo(this.camera.position) < 3.2);
+      if (near) this.collect(near);
+      else if (truth) this.scareNearbyAzevi();
+    }
+  }
+
+  // Photographier un Azévi tel qu'il est le fait reculer : il déteste être vu
+  private scareNearbyAzevi(): void {
+    const cam = this.camera.getWorldPosition(this.tmpA), dir = this.camera.getWorldDirection(this.tmpB);
+    for (const p of Object.values(this.world.people)) {
+      if (!p.root.visible || !p.def.azevi) continue;
+      p.root.getWorldPosition(this.tmpC);
+      const v = this.tmpC.sub(cam);
+      const d = v.length();
+      if (d < 12 && v.normalize().dot(dir) > 0.93) { this.audio.voiceMix('no', p.def.sex, { ghost: true, gain: 0.9 }); this.hud.say('[It turns its burnt face away from the flash]', 3); return; }
+    }
   }
 
   private camFlash(): void {
@@ -2892,14 +3004,33 @@ export class Game {
     const low = story.battery < 15;
     if (this.blackout > 0) this.blackout -= dt;
     const flicker = !this.flashOn || this.blackout > 0 ? 0 : low && Math.random() < 0.07 ? 0.15 : 1;
-    this.flash.intensity = 55 * k * flicker;
+    // De près, une vraie torche « brûle » le sujet : on mesure la distance à ce qui est devant
+    // (murs du village + personnages) et on adoucit le faisceau, comme l'exposition auto d'un téléphone
+    this.nearT -= dt;
+    if (this.nearT <= 0) {
+      this.nearT = 0.12;
+      const o = this.camera.getWorldPosition(this.tmpA), dir = this.camera.getWorldDirection(this.tmpB);
+      const ray = this.nearRay; ray.set(o, dir);
+      let d = 8;
+      for (const b of this.world.colliders) { const h = ray.intersectBox(b, this.tmpC); if (h) d = Math.min(d, h.distanceTo(o)); }
+      for (const p of Object.values(this.world.people)) {
+        if (!p.root.visible) continue;
+        p.root.getWorldPosition(this.tmpC); this.tmpC.y = o.y - 0.2;
+        const v = this.tmpC.sub(o), along = v.dot(dir);
+        if (along > 0 && v.lengthSq() - along * along < 0.25) d = Math.min(d, along);
+      }
+      this.nearD = d;
+    }
+    this.nearK += (THREE.MathUtils.clamp(Math.pow(this.nearD / 3.2, 1.4), 0.16, 1) - this.nearK) * Math.min(1, dt * 6);
+    this.flash.intensity = 55 * k * flicker * this.nearK;
     this.flash.distance = 14 + 18 * k;
-    this.fill.intensity = 6 * k * flicker;
+    this.fill.intensity = 6 * k * flicker * (0.4 + 0.6 * this.nearK);
     this.flash.color.setHSL(0.1, 0.25 + (1 - k) * 0.5, 0.92 - (1 - k) * 0.2);
 
     // Rétroviseur (clic droit maintenu)
-    const wantMirror = this.input.rightDown && locked && !this.phone.open && !this.fb && story.inventory.includes('Rear-view mirror');
+    const wantMirror = this.lens < 0.3 && this.input.rightDown && locked && !this.phone.open && !this.fb && story.inventory.includes('Rear-view mirror');
     this.mirror.update(dt, wantMirror, this.camera.position, this.player.yaw, this.player.pitch);
+    this.updateLens(dt, locked);
     if (this.mirror.raised > 0.8 && !hasFlag('sawDossi')) this.checkDossiInMirror();
 
     // Interaction (priorité : prise d'un Brûlé > choix > hibou > objet)
@@ -2934,7 +3065,7 @@ export class Game {
     if (this.input.wasPressed('Digit3') && story.inventory.includes('Machete')) this.viewmodel.equip('Machete');
     this.attackCd = Math.max(0, this.attackCd - dt);
     const weapon: WeaponDef | null = this.viewmodel.current ? WEAPONS[this.viewmodel.current] : null;
-    if (weapon && this.input.leftClicked && locked && !this.phone.open && this.mirror.raised < 0.3 && this.attackCd <= 0 && this.player.stamina > weapon.stamina * 0.5) {
+    if (weapon && this.input.leftClicked && locked && !this.phone.open && this.mirror.raised < 0.3 && this.lens < 0.3 && this.attackCd <= 0 && this.player.stamina > weapon.stamina * 0.5) {
       this.attackCd = weapon.cooldown;
       this.player.stamina = Math.max(0, this.player.stamina - weapon.stamina);
       this.viewmodel.attack();
@@ -3075,7 +3206,7 @@ export class Game {
     }
     const dead = story.battery <= 5 && hasFlag('trunk');
     this.hud.setTracker(dead ? 'Phone almost dead' : this.actLabel(index), dead ? 'Go back to your 4\u00d74 to charge your phone (follow the orange hazard lights).' : step.text,
-      'Tab phone \u00b7 M map \u00b7 F torch \u00b7 Right click mirror');
+      hasFlag('phoneOpened') ? 'Tab phone \u00b7 M map \u00b7 F torch \u00b7 V camera \u00b7 Right click mirror' : 'Tab phone \u00b7 M map \u00b7 F torch \u00b7 Right click mirror');
 
     // lieux : nom à l'arrivée, découverte pour la carte
     let here = '';
@@ -3157,6 +3288,12 @@ export class Game {
       setFlag('sawDossi');
       this.line('happy_mirror_dossi', 6);
       this.scare('stinger1');
+      // l'idée : si le miroir montre la vérité, l'objectif du téléphone aussi
+      setTimeout(() => {
+        if (this.mode !== 'playing') return;
+        this.phone.notify('camera', 'Camera', 'Hold V to raise the camera', 6);
+        this.hud.say('If the mirror shows the truth… maybe my phone’s camera does too. — Hold V to look through it.', 7);
+      }, 7500);
       this.save();
     }
   }
