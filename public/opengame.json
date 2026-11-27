@@ -1,0 +1,12 @@
+{
+  "$schema": "https://opengame.io/schema/opengame.json",
+  "owner": "@heyhappy",
+  "title": "AZETIN: The Last Healer",
+  "tagline": "Only the mirror tells you who is dead.",
+  "description": "Your 4x4 breaks down at night in front of Azé-tin, a West African village cursed since a fuel station exploded during a festival. The villagers smile, offer you food… but in your rear-view mirror, they are ash. Survive the night, uncover the chief's secret, and choose: flee, betray, or become the last healer. First-person survival horror with 4 endings.",
+  "genre": "shooter-survival",
+  "kind": "game",
+  "controls": ["keyboard", "mouse"],
+  "requires": { "renderer": "webgl2", "desktopOnly": true },
+  "players": "single"
+}

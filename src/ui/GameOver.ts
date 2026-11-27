@@ -43,10 +43,10 @@ export class GameOver {
   }
 
   // Carte de fin avant le générique : « Continue » (ou Espace) pour lancer les crédits, sinon elle part seule
-  endingCard(title: string, lines: string[], seconds: number): Promise<void> {
+  endingCard(title: string, lines: string[], seconds: number, button = 'Continue'): Promise<void> {
     this.showEnding(title, lines);
     const btn = this.root.querySelector<HTMLButtonElement>('.go-wake')!;
-    btn.textContent = 'Continue';
+    btn.textContent = button;
     this.card = true;
     return new Promise((res) => {
       this.onCard = () => finish();

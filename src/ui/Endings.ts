@@ -1,7 +1,7 @@
 // Les 4 fins, et celles que le joueur a déjà vues (gardées d'une partie à l'autre)
 export const ENDINGS = [
   { id: 'survivor', num: 'I', title: 'The Survivor', hint: 'Some leave before dawn. They never look back.' },
-  { id: 'azevi', num: 'II', title: 'The Azévi', hint: 'Eat what the dead offer you. Again and again.' },
+  { id: 'azevi', num: 'II', title: 'The Azévi', hint: 'Never eat what the dead offer you… unless you want to stay.' },
   { id: 'ashes', num: 'III', title: 'The Ashes', hint: 'A chief always keeps his word. His own way.' },
   { id: 'healer', num: 'IV', title: 'The Last Healer', hint: 'The hornbill only cries for those who listen. Find the whole truth.' },
 ] as const;

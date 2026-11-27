@@ -29,17 +29,25 @@ export class Director {
     this.skipHint.textContent = 'Space — skip';
   }
 
-  play(scene: Scene): void {
+  private skippable = true;
+
+  // skippable = false : une scène jouée (QTE), qu'Espace ne coupe pas
+  play(scene: Scene, skippable = true): void {
     this.scene = scene;
     this.t = 0;
     this.active = true;
+    this.skippable = skippable;
     this.bars.classList.add('on');
-    this.skipHint.classList.add('on');
+    this.skipHint.classList.toggle('on', skippable);
     document.body.classList.add('cine');
   }
 
   skip(): void {
     if (this.scene) this.finish();
+  }
+
+  userSkip(): void {
+    if (this.skippable) this.skip();
   }
 
   private finish(): void {

@@ -70,14 +70,14 @@ export const STEPS: Step[] = [
   { id: 'ayaba', text: 'Talk to the little girl by the stone', hint: 'She is waiting next to the stone of the dead.', target: () => ayabaPos(), done: () => hasFlag('ayaba') },
   { id: 'kossi', text: 'Follow her to the vulcanizer. Talk to Kossi', hint: 'His workshop is west of the village square (the blue sign).', target: at('atelier'), done: () => hasFlag('kossi') },
   { id: 'tube', text: 'Find an inner tube on the abandoned moto-taxi', hint: 'West of Kossi’s workshop, along the path.', target: () => ({ x: -30, z: 15 }), done: () => hasFlag('tube') },
-  { id: 'patch', text: 'Get the patch kit at Mama Dossi’s stall', hint: 'East of the village square (the red sign). She will offer you food.', target: () => ({ x: 9, z: 7.6 }), done: () => hasFlag('patch') },
+  { id: 'patch', text: 'Get the patch kit at Mama Dossi’s stall', hint: 'East of the village square (the red sign). She will offer you food… think twice.', target: () => ({ x: 9, z: 7.6 }), done: () => hasFlag('patch') },
   { id: 'mirror', text: 'Look at Mama Dossi in your mirror', hint: 'Turn your back to her, then hold the right mouse button.', target: () => ({ x: 9, z: 9.5 }), done: () => hasFlag('sawDossi') },
   { id: 'back', text: 'Bring the inner tube and the patch kit to Kossi', hint: 'Kossi’s workshop, west of the square.', target: at('atelier'), done: () => hasFlag('act1') },
   // ---- Acte II — La station
   { id: 'stump', text: 'Follow the hornbill to the stump of the sacred iroko', hint: 'Ayaba went north of the square. Listen: low, two notes.', target: () => ({ x: 1.6, z: -17.2 }), done: () => hasFlag('agossou') },
   { id: 'calabash', text: 'Take Dah Agossou’s calabash in his house', hint: 'North, by the lagoon. The white house behind the palisade.', target: () => ({ x: -7.4, z: -30.9 }), done: () => hasFlag('calabash') },
   { id: 'ashes', text: 'Search the old fuel station for the truth', hint: 'Three fragments lie in the ruins, east. Q throws kaolin if they come.', target: () => stationFragment(), done: () => STATION.every((f) => hasFlag('frag_' + f.id)) },
-  { id: 'power', text: 'Take the generator battery at the station', hint: 'The generator stands at the west corner of the ruins.', target: () => ({ x: 34.5, z: -0.6 }), done: () => hasFlag('power') },
+  { id: 'power', text: 'Take the generator battery at the station', hint: 'The generator stands at the west corner of the ruins. Now you can take its battery.', target: () => ({ x: 34.5, z: -0.6 }), done: () => hasFlag('power') },
   { id: 'midnight', text: 'Midnight is coming…', hint: 'Someone in this village wants to meet you.', target: () => null, done: () => hasFlag('act2') },
   // ---- Acte III — Le guérisseur (après la question de Kossi, à minuit)
   { id: 'repair', text: 'Midnight: go back to Kossi', hint: 'His workshop, west of the square. He has a question for you.', target: at('atelier'), done: () => hasFlag('repaired') },
@@ -96,7 +96,7 @@ export const STEPS: Step[] = [
     target: () => nextFragment(),
     done: () => !hasFlag('riteTold') || story.secret >= 5,
   },
-  { id: 'rite', text: 'Begin the rite at the asen, under the station ruins', hint: 'Press E at the asen. Kaolin (Q) holds them back, refill at the asen (E). Then chant every verse.', target: () => ({ x: 38.6, z: -2.8 }), done: () => !hasFlag('riteTold') },
+  { id: 'rite', text: 'Begin the rite at the asen, under the station ruins', hint: 'Press E at the asen. Then follow the keys on screen: hold them back, face Houngbo, sing every verse.', target: () => ({ x: 38.6, z: -2.8 }), done: () => !hasFlag('riteTold') },
   // chemin de la fuite (Happy a seulement voulu sa voiture)
   { id: 'leave', text: 'Your 4×4 is fixed. Drive away before dawn', hint: 'Changed your mind? Kossi can still tell you how to save Azé-tin.', target: () => ({ x: 1.2, z: 68 }), done: () => false },
 ];

@@ -58,56 +58,38 @@ const FRAGS: { id: string; title: string; text: string }[] = [
   { id: 'drawing', title: 'The owl on the roof', text: 'A child’s drawing: the tree, the houses, and a big black owl sitting on the chief’s roof.' },
 ];
 
-// Miniatures dessinées une fois (comme de vraies photos prises au flash)
-const thumbs: Record<string, string> = {};
+// L'analyse du téléphone (Visual Look Up) : des repères sur la photo, puis ce qu'ils révèlent
+const ANALYSIS: Record<string, { tags: [number, number, string][]; found: [string, string][] }> = {
+  photo: {
+    tags: [[64, 38, 'Iroko'], [49, 47, 'Chief'], [20, 50, 'Chainsaw'], [79, 55, 'Chainsaw']],
+    found: [['Tree', 'Iroko — “Loko”, a sacred tree. Cutting it is forbidden.'], ['Face', 'The man in the middle: Chief Houngbo, ten years younger.'],
+      ['Text', 'Back of the photo: “Loko — the last day.”'], ['Date', 'Printed on the corner: the week of the festival.']],
+  },
+  notebook: {
+    tags: [[40, 42, 'Barrel list'], [63, 36, 'Red ink'], [62, 62, 'Last line'], [85, 62, 'Signature']],
+    found: [['Text', 'A ledger of debts: timber dealers, a fuel trader, the prefecture.'], ['Last line', '“Paid in full — by the barrels.”'],
+      ['Signature', 'One letter, the same everywhere: H.']],
+  },
+  tape: {
+    tags: [[78, 34, 'Label'], [80, 55, 'Cassette'], [91, 70, 'Tape']],
+    found: [['Label', '“Dah A. — village”: Dah Agossou, the healer.'], ['Audio', 'Transcript: “Without Loko, the fire will have no roof!”'],
+      ['Voice', 'An old man, angry. Then shouting. Then silence.']],
+  },
+  register: {
+    tags: [[52, 45, 'Table'], [47, 59, 'Total'], [61, 60, 'Stamp']],
+    found: [['Count', '300 barrels × 200 L = 60,000 litres of kpayo.'], ['Place', 'Stored at the fuel station, next to the festival square.'],
+      ['Signed', 'H. — Houngbo knew. He stored the fire himself.']],
+  },
+  drawing: {
+    tags: [[49, 42, 'Tree'], [66, 54, 'Owl'], [35, 63, 'House'], [28, 70, 'Signature']],
+    found: [['Drawing', 'A child’s drawing. Signed in the corner: AYABA.'], ['Bird', 'An owl on the chief’s roof — here, the bird of the sorcerers.'],
+      ['Meaning', 'She knew who brought the death. She drew it before the fire.']],
+  },
+};
+
+// Les photos du secret : rendues dans Blender (public/photos)
 function thumb(id: string): string {
-  if (thumbs[id]) return thumbs[id];
-  const c = document.createElement('canvas');
-  c.width = c.height = 240;
-  const g = c.getContext('2d')!;
-  const flash = (base: string) => {
-    g.fillStyle = base; g.fillRect(0, 0, 240, 240);
-    const r = g.createRadialGradient(120, 110, 10, 120, 120, 170);
-    r.addColorStop(0, 'rgba(255,250,235,0.35)'); r.addColorStop(1, 'rgba(0,0,0,0.75)');
-    g.fillStyle = r; g.fillRect(0, 0, 240, 240);
-  };
-  switch (id) {
-    case 'photo':
-      flash('#2a2118');
-      g.fillStyle = '#e6dcc8'; g.fillRect(40, 45, 160, 140);
-      g.fillStyle = '#5a4c3c'; g.fillRect(50, 55, 140, 100);
-      g.fillStyle = '#2a221a'; g.fillRect(110, 70, 22, 85); g.beginPath(); g.arc(121, 75, 42, Math.PI, 0); g.fill();
-      g.fillStyle = '#17120e'; for (const x of [62, 82, 150, 170]) g.fillRect(x, 120, 9, 35);
-      break;
-    case 'notebook':
-      flash('#3a1410');
-      g.fillStyle = '#d8c8a4'; g.save(); g.translate(120, 120); g.rotate(-0.15); g.fillRect(-70, -90, 140, 180);
-      g.strokeStyle = '#a8241a'; g.lineWidth = 3; for (let y = -70; y < 80; y += 16) { g.beginPath(); g.moveTo(-58, y); g.lineTo(58, y); g.stroke(); }
-      g.restore();
-      break;
-    case 'tape':
-      flash('#1e1c1a');
-      g.fillStyle = '#111'; g.fillRect(50, 75, 140, 90);
-      g.fillStyle = '#d8cfa8'; g.fillRect(62, 85, 116, 34);
-      g.fillStyle = '#333'; g.beginPath(); g.arc(90, 140, 14, 0, 7); g.arc(150, 140, 14, 0, 7); g.fill();
-      g.fillStyle = '#5a3a1a'; g.font = 'italic 14px serif'; g.fillText('Dah A. — village', 74, 107);
-      break;
-    case 'register':
-      flash('#1c2430');
-      g.fillStyle = '#ddd2b8'; g.fillRect(45, 40, 150, 170);
-      g.fillStyle = '#222'; g.font = '11px monospace'; for (let i = 0; i < 10; i++) g.fillText(`FÛT ${120 + i * 20}  200 L`, 58, 62 + i * 15);
-      break;
-    case 'drawing':
-      flash('#2a2418');
-      g.fillStyle = '#d4c6a0'; g.fillRect(30, 30, 180, 180);
-      g.strokeStyle = '#2a6a2a'; g.lineWidth = 5; g.beginPath(); g.moveTo(110, 190); g.lineTo(110, 115); g.stroke();
-      g.fillStyle = '#3a8a3a'; g.beginPath(); g.arc(110, 95, 38, 0, 7); g.fill();
-      g.fillStyle = '#8a5a2a'; g.fillRect(48, 160, 30, 30); g.fillRect(150, 160, 30, 30);
-      g.fillStyle = '#111'; g.beginPath(); g.ellipse(165, 140, 22, 15, 0, 0, 7); g.fill();
-      g.fillStyle = '#ffcc33'; g.beginPath(); g.arc(158, 137, 3.5, 0, 7); g.arc(172, 137, 3.5, 0, 7); g.fill();
-      break;
-  }
-  return (thumbs[id] = c.toDataURL('image/jpeg', 0.8));
+  return `${import.meta.env.BASE_URL}photos/${id}.jpg`;
 }
 
 // Fond d'écran : la lagune de nuit, des palmiers (dessiné une fois)
@@ -192,6 +174,41 @@ export class Phone {
     this.bannerTimer = seconds;
   }
 
+  // ---- Aperçu en grand, sur tout l'écran : la photo, ses repères et l'analyse
+  private viewer: HTMLDivElement | null = null;
+  get viewerOpen(): boolean { return !!this.viewer?.classList.contains('on'); }
+
+  openViewer(id: string): void {
+    const f = FRAGS.find((x) => x.id === id);
+    if (!f) return;
+    const an = ANALYSIS[id];
+    if (!this.viewer) {
+      this.viewer = document.createElement('div');
+      this.viewer.className = 'photo-view';
+      document.body.appendChild(this.viewer);
+      this.viewer.addEventListener('click', (e) => { if ((e.target as HTMLElement).closest('.pv-close') || e.target === this.viewer) this.closeViewer(); });
+      addEventListener('keydown', (e) => { if (this.viewerOpen && (e.code === 'Escape' || e.code === 'Space')) { e.preventDefault(); this.closeViewer(); } });
+    }
+    const n = FRAGS.findIndex((x) => x.id === id) + 1;
+    this.viewer.innerHTML = `<div class="pv-box">
+        <div class="pv-img"><img src="${thumb(id)}" alt="">
+          ${an ? an.tags.map(([x, y, t], i) => `<span class="ph-tag pv-tag" style="left:${x}%;top:${y}%;animation-delay:${1.1 + i * 0.25}s"><i>${i + 1}</i>${t}</span>`).join('') : ''}<b class="ph-scanline"></b></div>
+        <aside class="pv-side"><small>THE SECRET · FRAGMENT ${n} OF 5</small><h3>${f.title}</h3>
+          ${an ? `<div class="ph-look pv-look"><small>✦ Look Up — ${an.found.length} results</small>${an.found.map(([k, v], i) => `<p style="animation-delay:${1.4 + i * 0.35}s"><b>${k}</b>${v}</p>`).join('')}</div>` : `<p>${f.text}</p>`}
+          <button class="pv-close">Close · Space</button></aside></div>`;
+    this.viewer.classList.add('on');
+  }
+
+  closeViewer(): void {
+    this.viewer?.classList.remove('on');
+  }
+
+  // Ouvre directement une photo du secret, avec son analyse
+  showPhoto(id: string): void {
+    this.sel = id;
+    this.show('photo');
+  }
+
   show(screen: Screen = 'home'): void {
     this.open = true;
     this.root.classList.add('on');
@@ -199,6 +216,7 @@ export class Phone {
   }
 
   hide(): void {
+    this.closeViewer();
     this.open = false;
     this.root.classList.remove('on');
   }
@@ -342,7 +360,11 @@ export class Phone {
         break;
       case 'photo': {
         const f = FRAGS.find((x) => x.id === this.sel)!;
-        html = `${this.nav('', 'photos', 'Photos')}<div class="ph-full" style="background-image:url(${thumb(f.id)})"></div><h5 class="ph-cap">${f.title}</h5><p class="ph-empty">${f.text}</p>`;
+        const an = ANALYSIS[f.id];
+        html = `${this.nav('', 'photos', 'Photos')}<div class="ph-full ph-scan" data-big="${f.id}" style="background-image:url(${thumb(f.id)})">
+            ${an ? an.tags.map(([x, y, t], i) => `<span class="ph-tag" style="left:${x}%;top:${y}%;animation-delay:${1.3 + i * 0.25}s"><i>${i + 1}</i>${t}</span>`).join('') : ''}<b class="ph-scanline"></b></div>
+          <p class="ph-tap">Tap the photo to view it full screen</p><h5 class="ph-cap">${f.title}</h5>
+          ${an ? `<div class="ph-look"><small>✦ Look Up — ${an.found.length} results</small>${an.found.map(([k, v], i) => `<p style="animation-delay:${1.6 + i * 0.35}s"><b>${k}</b>${v}</p>`).join('')}</div>` : `<p class="ph-empty">${f.text}</p>`}`;
         break;
       }
       case 'messages':
@@ -402,6 +424,7 @@ export class Phone {
     }
     this.body.innerHTML = html;
     this.body.querySelectorAll<HTMLElement>('[data-go]').forEach((b) => b.addEventListener('click', () => this.go(b.dataset.go as Screen)));
+    this.body.querySelectorAll<HTMLElement>('[data-big]').forEach((b) => b.addEventListener('click', () => this.openViewer(b.dataset.big!)));
     this.body.querySelectorAll<HTMLElement>('[data-photo]').forEach((b) => b.addEventListener('click', () => { this.sel = b.dataset.photo!; this.go('photo'); }));
     this.body.querySelectorAll<HTMLElement>('[data-thread]').forEach((b) => b.addEventListener('click', () => { this.sel = b.dataset.thread!; this.go('thread'); }));
     this.body.querySelectorAll<HTMLElement>('[data-sound]').forEach((b) => b.addEventListener('click', () => this.actions.onPlay(b.dataset.sound!)));

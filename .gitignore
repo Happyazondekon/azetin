@@ -9,3 +9,5 @@ dist/
 # Dossier de travail Blender (aperçus, textures, .glb non compressés)
 tools/blender/work/
 !.env.example
+# Paquet prêt à déposer sur OpenGame (aperçu privé)
+opengame-upload/
