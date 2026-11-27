@@ -1,3 +1,4 @@
+import { tr, lang, setLang } from '../story/i18n';
 import { story, clockText, hasFlag } from '../story/State';
 import { PLACES, PATHS, STEPS, currentStep } from '../story/Places';
 import { endingsSeen, ENDINGS } from './Endings';
@@ -169,7 +170,7 @@ export class Phone {
 
   /** Une notification, comme sur un vrai téléphone (SMS, photo enregistrée, mémo vocal…) */
   notify(app: string, title: string, text: string, seconds = 5): void {
-    this.banner.innerHTML = `<i style="background:${GRAD[app] ?? '#222'}"><svg viewBox="0 0 24 24">${ICON[app] ?? ''}</svg></i><div><b>${title}</b><span>${text}</span></div><em>now</em>`;
+    this.banner.innerHTML = `<i style="background:${GRAD[app] ?? '#222'}"><svg viewBox="0 0 24 24">${ICON[app] ?? ''}</svg></i><div><b>${tr(title)}</b><span>${tr(text)}</span></div><em>now</em>`;
     this.banner.classList.add('on');
     this.bannerTimer = seconds;
   }
@@ -178,7 +179,10 @@ export class Phone {
   private viewer: HTMLDivElement | null = null;
   get viewerOpen(): boolean { return !!this.viewer?.classList.contains('on'); }
 
-  openViewer(id: string): void {
+  private autoView = false;
+
+  openViewer(id: string, auto = false): void {
+    this.autoView = auto;
     const f = FRAGS.find((x) => x.id === id);
     if (!f) return;
     const an = ANALYSIS[id];
@@ -192,15 +196,19 @@ export class Phone {
     const n = FRAGS.findIndex((x) => x.id === id) + 1;
     this.viewer.innerHTML = `<div class="pv-box">
         <div class="pv-img"><img src="${thumb(id)}" alt="">
-          ${an ? an.tags.map(([x, y, t], i) => `<span class="ph-tag pv-tag" style="left:${x}%;top:${y}%;animation-delay:${1.1 + i * 0.25}s"><i>${i + 1}</i>${t}</span>`).join('') : ''}<b class="ph-scanline"></b></div>
-        <aside class="pv-side"><small>THE SECRET · FRAGMENT ${n} OF 5</small><h3>${f.title}</h3>
-          ${an ? `<div class="ph-look pv-look"><small>✦ Look Up — ${an.found.length} results</small>${an.found.map(([k, v], i) => `<p style="animation-delay:${1.4 + i * 0.35}s"><b>${k}</b>${v}</p>`).join('')}</div>` : `<p>${f.text}</p>`}
-          <button class="pv-close">Close · Space</button></aside></div>`;
+          ${an ? an.tags.map(([x, y, t], i) => `<span class="ph-tag pv-tag" style="left:${x}%;top:${y}%;animation-delay:${1.1 + i * 0.25}s"><i>${i + 1}</i>${tr(t)}</span>`).join('') : ''}<b class="ph-scanline"></b></div>
+        <aside class="pv-side"><small>${tr(`THE SECRET · FRAGMENT ${n} OF 5`)}</small><h3>${tr(f.title)}</h3>
+          ${an ? `<div class="ph-look pv-look"><small>✦ ${tr('Look Up')} — ${tr(`${an.found.length} results`)}</small>${an.found.map(([k, v], i) => `<p style="animation-delay:${1.4 + i * 0.35}s"><b>${tr(k)}</b>${tr(v)}</p>`).join('')}</div>` : `<p>${f.text}</p>`}
+          <button class="pv-close">${tr('Continue · Space')}</button></aside></div>`;
     this.viewer.classList.add('on');
   }
 
+  onViewerClose: () => void = () => {};
+
   closeViewer(): void {
-    this.viewer?.classList.remove('on');
+    if (!this.viewerOpen) return;
+    this.viewer!.classList.remove('on');
+    if (this.autoView) { this.autoView = false; this.onViewerClose(); }
   }
 
   // Ouvre directement une photo du secret, avec son analyse
@@ -311,7 +319,7 @@ export class Phone {
   }
 
   private nav(title: string, back: Screen = 'home', backLabel = 'Back'): string {
-    return `<div class="ph-nav"><button class="ph-back" data-go="${back}">${CHEV}<span>${backLabel}</span></button></div><h4>${title}</h4>`;
+    return `<div class="ph-nav"><button class="ph-back" data-go="${back}">${CHEV}<span>${tr(backLabel)}</span></button></div><h4>${tr(title)}</h4>`;
   }
 
   go(screen: Screen): void {
@@ -330,7 +338,7 @@ export class Phone {
             <div class="ph-w ph-w-note" data-go="notes"><small>${icon('notes')} Notes</small><b>${step.text}</b></div>
           </div>
           ${this.torchRow()}
-          <div class="ph-grid">${APPS.map(([id, name, ic]) => `<button class="ph-app" data-go="${id}">${icon(ic)}<span>${name}</span>${id === 'photos' && story.secret ? `<em>${story.secret}</em>` : ''}</button>`).join('')}</div>
+          <div class="ph-grid">${APPS.map(([id, name, ic]) => `<button class="ph-app" data-go="${id}">${icon(ic)}<span>${tr(name)}</span>${id === 'photos' && story.secret ? `<em>${story.secret}</em>` : ''}</button>`).join('')}</div>
           <div class="ph-dots"><i class="on"></i><i></i></div>
           <div class="ph-dock">${DOCK.map(([id, ic]) => `<button class="ph-app" data-go="${id}">${icon(ic)}${id === 'messages' ? `<em>${unread}</em>` : id === 'phone' ? '<em>3</em>' : ''}</button>`).join('')}</div>`;
         break;
@@ -342,17 +350,18 @@ export class Phone {
       case 'notes': {
         const cur = currentStep().index;
         const act = hasFlag('act2') ? 'Act III — The night of the Azévi' : hasFlag('act1') ? 'Act II — The station' : 'Act I — The village';
-        html = `${this.nav('Notes', 'home', 'Folders')}<div class="ph-note"><small>Today, ${clockText()}</small><h5>${act}</h5>
+        html = `${this.nav('Notes', 'home', 'Folders')}<div class="ph-note"><small>${tr('Today, ')}${clockText()}</small><h5>${tr(act)}</h5>
           <ul class="ph-steps">${STEPS.map((st, i) =>
-          i < cur || (st.done() && i !== cur) ? `<li class="done">${st.text}</li>`
-            : i === cur ? `<li class="now">${st.text}<small>${st.hint}</small></li>`
+          i < cur || (st.done() && i !== cur) ? `<li class="done">${tr(st.text)}</li>`
+            : i === cur ? `<li class="now">${tr(st.text)}<small>${tr(st.hint)}</small></li>`
               : '').join('')}</ul>
-          <div class="ph-counts"><span>Parts for Kossi <b>${story.pieces}/3</b></span>${hasFlag('act1') ? `<span>Fragments <b>${story.secret}/5</b></span><span>Plants <b>${story.plantes}/3</b></span>` : ''}${hasFlag('calabash') ? `<span>Kaolin <b>${story.kaolin}/5</b></span>` : ''}</div></div>`;
+          ${hasFlag('act2') && !hasFlag('ended') ? `<p class="ph-deal">${tr('Houngbo’s deal: burn the healer’s house (north, by the lagoon)… and he lets you leave.')}</p>` : ''}
+          <div class="ph-counts"><span>${tr('Parts for Kossi')} <b>${story.pieces}/3</b></span>${hasFlag('act1') ? `<span>${tr('Fragments')} <b>${story.secret}/5</b></span><span>${tr('Plants')} <b>${story.plantes}/3</b></span>` : ''}${hasFlag('calabash') ? `<span>Kaolin <b>${story.kaolin}/5</b></span>` : ''}</div></div>`;
         break;
       }
       case 'photos':
       case 'camera':
-        html = `${this.nav(screen === 'camera' ? 'Recents' : 'Photos')}<p class="ph-sub">The secret · ${story.secret} of 5</p>
+        html = `${this.nav(screen === 'camera' ? 'Recents' : 'Photos')}<p class="ph-sub">${tr(`The secret · ${story.secret} of 5`)}</p>
           <div class="ph-photos">${FRAGS.map((f) => hasFlag('frag_' + f.id)
           ? `<button class="ph-photo" data-photo="${f.id}" style="background-image:url(${thumb(f.id)})"></button>`
           : '<div class="ph-photo empty"></div>').join('')}</div>
@@ -362,9 +371,9 @@ export class Phone {
         const f = FRAGS.find((x) => x.id === this.sel)!;
         const an = ANALYSIS[f.id];
         html = `${this.nav('', 'photos', 'Photos')}<div class="ph-full ph-scan" data-big="${f.id}" style="background-image:url(${thumb(f.id)})">
-            ${an ? an.tags.map(([x, y, t], i) => `<span class="ph-tag" style="left:${x}%;top:${y}%;animation-delay:${1.3 + i * 0.25}s"><i>${i + 1}</i>${t}</span>`).join('') : ''}<b class="ph-scanline"></b></div>
-          <p class="ph-tap">Tap the photo to view it full screen</p><h5 class="ph-cap">${f.title}</h5>
-          ${an ? `<div class="ph-look"><small>✦ Look Up — ${an.found.length} results</small>${an.found.map(([k, v], i) => `<p style="animation-delay:${1.6 + i * 0.35}s"><b>${k}</b>${v}</p>`).join('')}</div>` : `<p class="ph-empty">${f.text}</p>`}`;
+            ${an ? an.tags.map(([x, y, t], i) => `<span class="ph-tag" style="left:${x}%;top:${y}%;animation-delay:${1.3 + i * 0.25}s"><i>${i + 1}</i>${tr(t)}</span>`).join('') : ''}<b class="ph-scanline"></b></div>
+          <p class="ph-tap">${tr('Tap the photo to view it full screen')}</p><h5 class="ph-cap">${tr(f.title)}</h5>
+          ${an ? `<div class="ph-look"><small>✦ ${tr('Look Up')} — ${tr(`${an.found.length} results`)}</small>${an.found.map(([k, v], i) => `<p style="animation-delay:${1.6 + i * 0.35}s"><b>${tr(k)}</b>${tr(v)}</p>`).join('')}</div>` : `<p class="ph-empty">${f.text}</p>`}`;
         break;
       }
       case 'messages':
@@ -410,16 +419,17 @@ export class Phone {
       case 'settings':
       case 'pause':
         html = `${screen === 'pause'
-          ? '<div class="ph-pausehead"><b>Paused</b><span>The village is waiting.</span></div><button class="ph-btnx" data-act="resume">Resume</button>'
+          ? `<div class="ph-pausehead"><b>${tr('Paused')}</b><span>${tr('The village is waiting.')}</span></div><button class="ph-btnx" data-act="resume">${tr('Resume')}</button>`
           : this.nav('Settings')}
           <div class="ph-group">
-            <label class="ph-row ph-range"><span>Mouse sensitivity</span><input type="range" min="0.3" max="2.5" step="0.05" value="${this.sensitivity}" data-set="sens"></label>
-            <label class="ph-row ph-range"><span>Volume</span><input type="range" min="0" max="1" step="0.05" value="${this.volume}" data-set="vol"></label>
-            <label class="ph-row ph-range"><span>Brightness</span><input type="range" min="0.9" max="2.6" step="0.05" value="${this.brightness}" data-set="bright"></label>
-            <label class="ph-row ph-toggle"><span>Objective marker</span><input type="checkbox" ${this.marker ? 'checked' : ''} data-set="marker"><i></i></label>
+            <label class="ph-row ph-range"><span>${tr('Mouse sensitivity')}</span><input type="range" min="0.3" max="2.5" step="0.05" value="${this.sensitivity}" data-set="sens"></label>
+            <label class="ph-row ph-range"><span>${tr('Volume')}</span><input type="range" min="0" max="1" step="0.05" value="${this.volume}" data-set="vol"></label>
+            <label class="ph-row ph-range"><span>${tr('Brightness')}</span><input type="range" min="0.9" max="2.6" step="0.05" value="${this.brightness}" data-set="bright"></label>
+            <label class="ph-row ph-toggle"><span>${tr('Objective marker')}</span><input type="checkbox" ${this.marker ? 'checked' : ''} data-set="marker"><i></i></label>
+            <div class="ph-row ph-lang"><span>${tr('Language')}</span><span class="ph-seg"><button data-lang="en" class="${lang() === 'en' ? 'on' : ''}">EN</button><button data-lang="fr" class="${lang() === 'fr' ? 'on' : ''}">FR</button></span></div>
           </div>
-          <p class="ph-empty">Keys follow your keyboard: ZQSD (AZERTY) or WASD (QWERTY). Kaolin: A (AZERTY) / Q (QWERTY).</p>
-          ${screen === 'pause' ? '<button class="ph-btnx ghost" data-act="quit">Save and quit to title</button>' : ''}`;
+          <p class="ph-empty">${tr('Voices stay in English.')} ${tr('Keys follow your keyboard: ZQSD (AZERTY) or WASD (QWERTY). Kaolin: A (AZERTY) / Q (QWERTY).')}</p>
+          ${screen === 'pause' ? `<button class="ph-btnx ghost" data-act="quit">${tr('Save and quit to title')}</button>` : ''}`;
         break;
     }
     this.body.innerHTML = html;
@@ -429,6 +439,7 @@ export class Phone {
     this.body.querySelectorAll<HTMLElement>('[data-thread]').forEach((b) => b.addEventListener('click', () => { this.sel = b.dataset.thread!; this.go('thread'); }));
     this.body.querySelectorAll<HTMLElement>('[data-sound]').forEach((b) => b.addEventListener('click', () => this.actions.onPlay(b.dataset.sound!)));
     this.body.querySelector('[data-act="torch"]')?.addEventListener('click', () => { this.actions.onTorch(); if (this.screen === 'home') this.go('home'); });
+    this.body.querySelectorAll<HTMLElement>('[data-lang]').forEach((b) => b.addEventListener('click', () => { setLang(b.dataset.lang as 'en' | 'fr'); this.go(this.screen); }));
     this.body.querySelector('[data-act="resume"]')?.addEventListener('click', () => this.actions.onResume());
     this.body.querySelector('[data-act="quit"]')?.addEventListener('click', () => this.actions.onQuit());
     this.body.querySelectorAll<HTMLInputElement>('input[data-set]').forEach((inp) =>

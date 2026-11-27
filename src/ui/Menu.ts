@@ -1,3 +1,4 @@
+import { tr, lang, setLang, onLang } from '../story/i18n';
 import { ENDINGS, endingsSeen } from './Endings';
 
 // Menu principal : entrées gravées comme les noms de la stèle, braise orange au survol.
@@ -10,12 +11,16 @@ export interface MenuActions {
 
 const endingsPanel = () => {
   const seen = endingsSeen();
-  return `<h3>Endings</h3><ul class="endings">${ENDINGS.map((e) => seen.includes(e.id) ? `<li>${e.num} · ${e.title}</li>` : `<li class="locked">${e.num} · ???<small>${e.hint}</small></li>`).join('')}</ul>
+  return `<h3>${tr('Endings')}</h3><ul class="endings">${ENDINGS.map((e) => seen.includes(e.id) ? `<li>${e.num} · ${tr(e.title)}</li>` : `<li class="locked">${e.num} · ???<small>${tr(e.hint)}</small></li>`).join('')}</ul>
     <p class="hint">${seen.length}/4</p>`;
 };
 
 const PANELS: Record<string, string> = {
-  settings: `<h3>Settings</h3><p>Open your phone (Tab) during the game to change settings.</p>`,
+  get settings() {
+    return `<h3>${tr('Settings')}</h3><p class="menu-lang">${tr('Subtitles & interface')}
+      <span class="ph-seg"><button data-lang="en" class="${lang() === 'en' ? 'on' : ''}">English</button><button data-lang="fr" class="${lang() === 'fr' ? 'on' : ''}">Français</button></span></p>
+      <p class="hint">${tr('Voices stay in English.')} ${tr('Open your phone (Tab) during the game to change the other settings.')}</p>`;
+  },
   credits: `<h3>Credits</h3><p>A game by <b>Happy Azondekon</b> · HeyHappy Studio</p>
     <p>Made for OpenGame Game Jam #1 · Voices, sound and music: ElevenLabs</p>
     <p class="small">3D models: HeyHappy Studio (Blender). Generator by KolosStudios (CC BY 3.0, poly.pizza) ·
@@ -49,6 +54,12 @@ export class Menu {
     this.panel = this.root.querySelector('.menu-panel')!;
     this.continueBtn = this.root.querySelector('[data-a="continue"]')!;
     this.setSave(hasSave);
+    const relabel = () => {
+      this.root.querySelectorAll<HTMLButtonElement>('nav button').forEach((b) => { b.dataset.en ??= b.textContent ?? ''; b.textContent = tr(b.dataset.en); });
+      const foot = this.root.querySelector<HTMLElement>('.menu-foot')!; foot.dataset.en ??= foot.textContent ?? ''; foot.textContent = tr(foot.dataset.en);
+    };
+    relabel();
+    onLang(relabel);
 
     this.root.querySelectorAll<HTMLButtonElement>('nav button').forEach((b) => {
       b.addEventListener('click', () => {
@@ -69,7 +80,7 @@ export class Menu {
       el.className = 'menu-loading';
       this.root.querySelector('nav')!.before(el);
     }
-    el.textContent = text ?? '';
+    el.textContent = text ? tr(text) : '';
     el.style.display = text ? 'block' : 'none';
     this.root.querySelector<HTMLButtonElement>('[data-a="new"]')!.disabled = !!text;
     if (text) this.continueBtn.disabled = true;
@@ -89,6 +100,11 @@ export class Menu {
     this.panel.innerHTML = html;
     this.panel.dataset.name = name;
     this.panel.classList.toggle('on', !same);
+    this.panel.querySelectorAll<HTMLElement>('[data-lang]').forEach((b) => b.addEventListener('click', () => {
+      setLang(b.dataset.lang as 'en' | 'fr');
+      this.panel.classList.remove('on');
+      this.showPanel(name);
+    }));
   }
 
   show(hasSave: boolean): void {

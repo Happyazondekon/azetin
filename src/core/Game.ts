@@ -22,6 +22,7 @@ import { markEnding, endingsSeen } from '../ui/Endings';
 import { Credits } from '../ui/Credits';
 import { LAYER_SEEN, LAYER_TRUTH } from '../world/Village';
 import LINES from '../story/lines.json';
+import { tr, lang } from '../story/i18n';
 import { buildPerson, randomLook, type Person } from '../world/People';
 import { story, resetStory, loadGame, saveGame, hasSave, hasFlag, setFlag, clearSave } from '../story/State';
 
@@ -176,6 +177,7 @@ export class Game {
       onMarker: (on) => (this.markerOn = on),
       where: () => ({ x: this.player.pos.x, z: this.player.pos.z, yaw: this.player.yaw, target: this.target() }),
     });
+    this.phone.onViewerClose = () => this.afterViewer();
     this.menu = new Menu(root, { onNew: () => this.start(false), onContinue: () => this.start(true), onCredits: () => void this.menuCredits() }, hasSave());
     this.menu.setLoading('Searching for network… 0%');
 
@@ -236,6 +238,10 @@ export class Game {
     this.interactables = this.buildInteractables();
     this.ready = true;
     this.restartPrompt();
+    // le son démarre au premier geste sur l'accueil (le navigateur l'exige) : la musique du menu se lance
+    const unlock = () => { this.audio.start(); this.audioReady = true; };
+    addEventListener('pointerdown', unlock, { once: true });
+    addEventListener('keydown', unlock, { once: true });
     // la touche du kaolin telle qu'elle est écrite sur le clavier du joueur (Q en QWERTY, A en AZERTY)
     const kb = (navigator as unknown as { keyboard?: { getLayoutMap?: () => Promise<Map<string, string>> } }).keyboard;
     kb?.getLayoutMap?.().then((m) => { const k = m.get('KeyQ'); if (k) this.kaolinKey = k.toUpperCase(); }).catch(() => {});
@@ -442,9 +448,10 @@ export class Game {
   }
 
   private speak(who: string, text: string, seconds = 6, id?: string): void {
+    const shown = lang() === 'fr' ? ((id && (LINES as Record<string, { fr?: string }>)[id]?.fr) || tr(text)) : text;
     const p = this.world.people[who];
-    const name = who === 'happy' ? 'Happy' : who === 'kossi' ? 'Kossi' : who === 'dossi' ? 'Mama Dossi' : who === 'ayaba' ? 'Ayaba' : who === 'radio' ? 'Radio' : /^v\d/.test(who) ? 'A villager' : '';
-    this.subtitles(name, text, seconds);
+    const name = who === 'happy' ? 'Happy' : who === 'kossi' ? 'Kossi' : who === 'dossi' ? 'Mama Dossi' : who === 'ayaba' ? 'Ayaba' : who === 'radio' ? 'Radio' : who === 'agossou' ? 'Dah Agossou' : who === 'houngbo' ? 'Houngbo' : /^v\d/.test(who) ? 'A villager' : '';
+    this.subtitles(name, shown, seconds);
     const d = p ? p.root.position.distanceTo(this.player.pos) : 0;
     const gain = who === 'happy' ? 0.9 : who === 'radio' ? 0.7 : Math.max(0.3, 1 - d / 18);
     const pan = p ? this.panOf(p.root.position) : 0;
@@ -456,7 +463,7 @@ export class Game {
     if (!id) return fallback();
     void this.audio.playLine(id, { gain, pan, ghost: !!p?.def.azevi, radio: who === 'radio' }).then((dur) => {
       if (!dur) fallback();
-      else if (dur + 0.6 > seconds) this.subtitles(name, text, dur + 0.6); // le sous-titre suit la durée de la voix
+      else if (dur + 0.6 > seconds) this.subtitles(name, shown, dur + 0.6); // le sous-titre suit la durée de la voix
     });
   }
 
@@ -475,7 +482,7 @@ export class Game {
     let t = 0;
     for (const c of chunks) {
       const len = (seconds * c.length) / text.length;
-      this.subTimers.push(window.setTimeout(() => this.hud.say(name ? `${name}: ${c.trim()}` : c.trim(), len + 0.3), t * 1000));
+      this.subTimers.push(window.setTimeout(() => this.hud.say(name ? `${tr(name)}: ${c.trim()}` : c.trim(), len + 0.3), t * 1000));
       t += len;
     }
   }
@@ -1053,12 +1060,12 @@ export class Game {
     this.audio.loop('fire', w.flameScale[0] * Math.max(0, 1 - fireD / 12) * 0.7);
     this.audio.loop('drone', 0.12 + story.pieces * 0.06 + (hasFlag('act1') ? 0.1 : 0));
     // la nuit d'Azé-tin : la cloche, le vent, le tambour qui bat (dès l'Acte II, plus fort après minuit)
-    this.audio.loop('nightmusic', hasFlag('ended') || this.rite ? 0 : hasFlag('act2') ? 0.3 : hasFlag('act1') ? 0.18 : 0.08, 'music/night.mp3');
+    this.audio.loop('nightmusic', hasFlag('ended') || this.rite ? 0 : hasFlag('act2') ? 0.55 : hasFlag('act1') ? 0.4 : 0.22, 'music/night.mp3');
     let close = 99;
     for (const e of this.enemies.list) close = Math.min(close, e.pos.distanceTo(pos));
     const heart = Math.max(close < 14 ? 1 - close / 14 : 0, story.souffle < 50 ? (50 - story.souffle) / 50 : 0);
     this.audio.loop('heartbeat', heart * 0.9);
-    this.audio.loop('tension', close < 10 ? 0.35 : 0, 'music/tension.mp3');
+    this.audio.loop('tension', close < 14 ? 0.6 : 0, 'music/tension.mp3');
   }
 
   // ================================================================ ACTE II — LA STATION
@@ -1267,16 +1274,16 @@ export class Game {
       setTimeout(() => { if (this.mode === 'playing' && !this.fb) { this.audio.sfx('owl', { gain: 1.3 }); this.owlQte = { t: 3.5, ok: false }; } }, 2500);
     }
     this.phone.notify('photos', 'Photos', `Saved to “The secret” · ${story.secret} of 5`, 4);
-    // le téléphone s'ouvre sur la photo et l'analyse (Tab pour le ranger)
+    // le téléphone s'ouvre, la photo s'affiche en grand avec son analyse : le jeu est en pause pendant la lecture
+    if (story.secret === 3 && !hasFlag('flashback')) this.flashbackPending = true;
     setTimeout(() => {
-      if (this.mode !== 'playing' || this.phone.open || this.grab || this.fb) return;
+      if (this.mode !== 'playing' || this.fb) return;
       setFlag('phoneOpened');
       this.phone.showPhoto(pk.id);
+      this.phone.openViewer(pk.id, true);
       document.exitPointerLock();
-      if (!hasFlag('lookUpHint')) { setFlag('lookUpHint'); this.hud.say('[Your phone analyses the photo. Press Tab to put it away.]', 5); }
-    }, 900);
+    }, 600);
     this.save();
-    if (story.secret === 3 && !hasFlag('flashback')) setTimeout(() => this.startFlashback(), pk.id === 'tape' ? 14000 : 6500);
   }
 
   // La souche de Loko : le calao s'y pose, Dah Agossou parle pour la première fois
@@ -1327,6 +1334,18 @@ export class Game {
     dancers: Person[]; agossou: Person | null; lamp: THREE.Object3D | null; barrels: THREE.Object3D | null;
     runners: { p: Person; dir: THREE.Vector3; t: number; fire: FireHandle | null }[];
   } | null = null;
+
+  // La photo en grand vient d'être fermée : le téléphone se range, la partie reprend (ou le souvenir commence)
+  private flashbackPending = false;
+  private afterViewer(): void {
+    if (this.phone.open) this.phone.hide();
+    if (this.mode === 'playing') this.lock();
+    if (this.flashbackPending) {
+      this.flashbackPending = false;
+      this.hud.say('Happy: The barrels… the festival… Wait. I think I understand now.', 4);
+      setTimeout(() => this.startFlashback(), 2600);
+    }
+  }
 
   private startFlashback(): void {
     if (this.mode !== 'playing' || this.fb) { if (!hasFlag('flashback')) setTimeout(() => this.startFlashback(), 3000); return; }
@@ -1893,9 +1912,22 @@ export class Game {
   }
 
   // ---------------------------------------------------------------- choix III : brûler la maison du guérisseur
+  private burnWarned = false;
   private burnHouse(): void {
-    // E = s'éloigner (la voie sûre), R = mettre le feu
-    this.ask('Step away', () => this.hud.say('Not like this.', 2), 'Set the healer’s house on fire', () => this.burnScene());
+    if (this.choice || this.burnWarned) return;
+    // la voix du guérisseur s'élève de sa maison : un dernier avertissement avant le choix
+    this.burnWarned = true;
+    this.audio.sfx('whispers', { gain: 1, pan: this.panOf(new THREE.Vector3(-6, 1.5, -33)) });
+    this.audio.sfx('stinger3', { gain: 0.5 });
+    this.shake = Math.max(this.shake, 0.25);
+    this.blackout = 0.25;
+    this.line('agossou_warn', 4.5);
+    setTimeout(() => {
+      this.burnWarned = false;
+      if (this.mode !== 'playing') return;
+      // E = s'éloigner (la voie sûre), R = mettre le feu
+      this.ask('Step away', () => this.hud.say('Not like this.', 2), 'Set the healer’s house on fire', () => this.burnScene());
+    }, 3800);
   }
 
   private burnScene(): void {
@@ -1972,7 +2004,8 @@ export class Game {
     this.mode = 'cine';
     this.hud.hideAll();
     this.hud.setKaolin(null);
-    this.audio.loop('credits', 0.6, dawn ? 'music/dawn.mp3' : 'music/theme.mp3');
+    this.audio.loop('nightmusic', 0, 'music/night.mp3');
+    this.audio.loop('credits', 0.85, dawn ? 'music/dawn.mp3' : 'music/theme.mp3');
     this.creditsOn = true; // le village 3D n'est plus dessiné derrière le générique
     await new Credits().play(dawn, last);
     this.creditsOn = false;
@@ -1992,6 +2025,12 @@ export class Game {
   }
 
   // Écran de la fin (titre + quelques lignes), puis le générique, puis retour direct à l'accueil
+  // L'illustration de chaque fin (rendue dans Blender)
+  private endingPic(title: string): string {
+    const id = title.includes('IV') ? 'healer' : title.includes('III') ? 'ashes' : title.includes('II') ? 'azevi' : 'survivor';
+    return `photos/end-${id}.jpg`;
+  }
+
   private async finalScreen(title: string, lines: string[], dawn = false, restart = false): Promise<void> {
     setFlag('ended');
     clearSave();
@@ -2003,13 +2042,13 @@ export class Game {
     document.exitPointerLock();
     if (restart) {
       // une fin « courte » : pas de générique, on recommence depuis le début
-      await this.gameOver.endingCard(title, lines, 40, 'Start again from the beginning');
+      await this.gameOver.endingCard(title, lines, 40, 'Start again from the beginning', this.endingPic(title));
       try { sessionStorage.setItem('azetin.restart', '1'); } catch { /* navigation privée */ }
       document.body.style.background = '#000';
       location.reload();
       return;
     }
-    await this.gameOver.endingCard(title, lines, 16);
+    await this.gameOver.endingCard(title, lines, 22, 'Continue', this.endingPic(title));
     await this.rollCredits(dawn, dawn ? 'Azé-tin sleeps in peace.' : 'Azé-tin is waiting.');
     // l'accueil, avec un village tout neuf (fondu au noir pendant le rechargement)
     document.body.style.background = '#000';
@@ -2042,9 +2081,10 @@ export class Game {
     const rot: Record<string, number> = { up: 0, right: 90, down: 180, left: 270 };
     const glyph = (k: string) => (k === 'kaolin' ? `<i>${this.kaolinKey}</i>` : `<img src="${import.meta.env.BASE_URL}ui/icon-arrow.png" style="transform:rotate(${rot[k]}deg)" alt="">`);
     const now = q.keys[q.idx];
-    el.innerHTML = `<small>${q.title}</small><div>${q.keys.map((k, i) => `<b class="${i < q.idx ? 'ok' : i === q.idx ? 'now' : ''}${k === 'kaolin' ? ' kao' : ''}">${glyph(k)}</b>`).join('')}</div>
+    el.innerHTML = `<small>${tr(q.title)}</small><div>${q.keys.map((k, i) => `<b class="${i < q.idx ? 'ok' : i === q.idx ? 'now' : ''}${k === 'kaolin' ? ' kao' : ''}">${glyph(k)}</b>`).join('')}</div>
       <span class="qbar"><span style="width:${Math.max(0, Math.min(1, q.keyT / q.per)) * 100}%"></span></span>
-      ${now === 'kaolin' ? `<strong>HE STRIKES — THROW KAOLIN (${this.kaolinKey})!</strong>` : `<em>${q.sub}</em>`}`;
+      <span class="qlife"><b>${tr('BREATH')}</b><span><span style="width:${Math.max(0, story.souffle)}%"></span></span></span>
+      ${now === 'kaolin' ? `<strong>${tr('HE STRIKES — THROW KAOLIN')} (${this.kaolinKey})!</strong>` : `<em>${tr(q.sub)}</em>`}`;
     el.classList.add('on');
   }
 
@@ -2113,6 +2153,8 @@ export class Game {
     // ---- les coups reçus
     const hit = (dmg: number, msg: string) => {
       story.souffle -= dmg;
+      this.lastHurt = this.time;
+      this.hud.setDanger(Math.max(0, 1 - story.souffle / 100));
       r.shake = 0.55;
       this.scare('stinger2', 0.7);
       this.audio.thud();
@@ -2649,9 +2691,12 @@ export class Game {
     // au menu : le coucher du soleil ; en jeu : l'heure de l'histoire
     this.world.sky.update(this.mode === 'menu' ? 19 * 60 + 6 : story.minutes, this.camera);
 
-    this.audio.loop('theme', this.mode === 'menu' ? 0.55 : 0, 'music/theme.mp3');
+    this.audio.loop('theme', this.mode === 'menu' ? 0.75 : 0, 'music/theme.mp3');
     if (this.mode === 'menu') this.updateMenuCamera();
-    else if (this.mode === 'playing') this.updatePlaying(dt);
+    else if (this.mode === 'playing') {
+      if (this.phone.viewerOpen) this.hud.setPrompt(null); // lecture d'une preuve : tout est figé
+      else this.updatePlaying(dt);
+    }
     else if (this.mode === 'cine') {
       if (this.input.wasPressed('Space')) this.director.userSkip();
       this.lightsOff();
@@ -2834,11 +2879,11 @@ export class Game {
       this.updateQte(dt);
     } else if (this.choice) {
       const c = this.choice;
-      this.hud.setPrompt(`E — ${c.a}      R — ${c.b}`);
+      this.hud.setPrompt(`E — ${tr(c.a)}      R — ${tr(c.b)}`);
       if (this.input.wasPressed('KeyE')) { this.choice = null; c.onA(); }
       else if (this.input.wasPressed('KeyR')) { this.choice = null; c.onB(); }
     } else {
-      if (!this.owlQte) this.hud.setPrompt(it ? `E — ${it.label()}` : charging ? `Phone charging… ${Math.round(story.battery)}%` : null);
+      if (!this.owlQte) this.hud.setPrompt(it ? `E — ${tr(it.label() ?? '')}` : charging ? tr(`Phone charging… ${Math.round(story.battery)}%`) : null);
       if (it && this.input.wasPressed('KeyE')) it.use();
     }
     this.updateWalkers(dt);
@@ -2923,6 +2968,7 @@ export class Game {
     }
 
     if (!this.fb && !this.rite) this.guide();
+    else this.hud.setDealMarker(null);
     this.beats(dt);
 
     // ---- Souffle : remonte lentement si rien ne frappe, vite au 4×4 ----
@@ -3007,20 +3053,29 @@ export class Game {
     this.hereId = here;
 
     // marqueur d'objectif projeté à l'écran (collé au bord s'il est hors champ)
-    const t = this.target();
-    if (!t || !this.markerOn || this.phone.open) { this.hud.setMarker(null); return; }
-    const dist = Math.hypot(t.x - this.player.pos.x, t.z - this.player.pos.z);
-    if (dist < 3) { this.hud.setMarker(null); return; }
-    this.proj.set(t.x, 1.6, t.z).project(this.camera);
     const W = innerWidth, H = innerHeight;
-    let x = (this.proj.x * 0.5 + 0.5) * W, y = (-this.proj.y * 0.5 + 0.5) * H;
-    const behind = this.proj.z > 1;
-    let edge = behind || x < 40 || x > W - 40 || y < 60 || y > H - 60;
-    if (behind) { x = W - x; y = H - 70; }
-    x = Math.min(W - 40, Math.max(40, x));
-    y = Math.min(H - 70, Math.max(70, y));
-    if (behind) edge = true;
-    this.hud.setMarker(x, y, `${Math.round(dist)} m`, edge);
+    const project = (t: { x: number; z: number }): [number, number, boolean, number] | null => {
+      const dist = Math.hypot(t.x - this.player.pos.x, t.z - this.player.pos.z);
+      if (dist < 3) return null;
+      this.proj.set(t.x, 1.6, t.z).project(this.camera);
+      let x = (this.proj.x * 0.5 + 0.5) * W, y = (-this.proj.y * 0.5 + 0.5) * H;
+      const behind = this.proj.z > 1;
+      let edge = behind || x < 40 || x > W - 40 || y < 60 || y > H - 60;
+      if (behind) { x = W - x; y = H - 70; }
+      x = Math.min(W - 40, Math.max(40, x));
+      y = Math.min(H - 70, Math.max(70, y));
+      if (behind) edge = true;
+      return [x, y, edge, dist];
+    };
+    const off = !this.markerOn || this.phone.open;
+    // l'autre direction de l'Acte III, en rouge : le marché de Houngbo
+    const deal = !off && hasFlag('act2') && !hasFlag('ended') && !this.rite ? project({ x: -6, z: -30.4 }) : null;
+    if (deal) this.hud.setDealMarker(deal[0], deal[1], `${tr('Burn')} · ${Math.round(deal[3])} m`, deal[2]);
+    else this.hud.setDealMarker(null);
+    const t = this.target();
+    const m = t && !off ? project(t) : null;
+    if (!m) { this.hud.setMarker(null); return; }
+    this.hud.setMarker(m[0], m[1], `${Math.round(m[3])} m`, m[2]);
   }
 
   // Murmures : les Azévi proches chuchotent quand Happy passe (et parfois, de loin, des voix sans corps)

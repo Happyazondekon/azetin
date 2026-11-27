@@ -1,3 +1,4 @@
+import { tr } from '../story/i18n';
 // Pas de HUD permanent : seulement l'invite d'interaction, les sous-titres,
 // l'annonce d'objectif et un voile qui rougit quand le souffle baisse.
 export class Hud {
@@ -7,6 +8,7 @@ export class Hud {
   private veil: HTMLDivElement;
   private tracker: HTMLDivElement;
   private marker: HTMLDivElement;
+  private marker2: HTMLDivElement;
   private placename: HTMLDivElement;
   private grab: HTMLDivElement;
   private kaolin: HTMLDivElement;
@@ -28,6 +30,7 @@ export class Hud {
     this.toast = el('toast');
     this.tracker = el('tracker');
     this.marker = el('marker');
+    this.marker2 = el('marker deal');
     this.placename = el('placename');
     this.grab = el('grabbed');
     this.kaolin = el('kaolin');
@@ -36,7 +39,7 @@ export class Hud {
   // Objectif en cours, toujours visible en haut à gauche
   setTracker(step: string | null, text = '', keys = ''): void {
     this.tracker.style.opacity = step ? '1' : '0';
-    if (step) this.tracker.innerHTML = `<div class="t-step">${step}</div><div class="t-text">${text}</div><div class="t-keys">${keys}</div>`;
+    if (step) this.tracker.innerHTML = `<div class="t-step">${tr(step)}</div><div class="t-text">${tr(text)}</div><div class="t-keys">${tr(keys)}</div>`;
   }
 
   // Repère d'objectif à l'écran (x, y en pixels ; edge = hors champ, collé au bord)
@@ -46,12 +49,22 @@ export class Hud {
     this.marker.classList.toggle('edge', edge);
     this.marker.style.left = `${x}px`;
     this.marker.style.top = `${y}px`;
-    this.marker.innerHTML = `<img src="${import.meta.env.BASE_URL}ui/icon-ember.png" alt="">${label}`;
+    this.marker.innerHTML = `<img src="${import.meta.env.BASE_URL}ui/icon-ember.png" alt="">${tr(label)}`;
+  }
+
+  // Second repère, rouge : la direction de Houngbo (brûler la maison du guérisseur)
+  setDealMarker(x: number | null, y = 0, label = '', edge = false): void {
+    if (x === null) { this.marker2.classList.remove('on'); return; }
+    this.marker2.classList.add('on');
+    this.marker2.classList.toggle('edge', edge);
+    this.marker2.style.left = `${x}px`;
+    this.marker2.style.top = `${y}px`;
+    this.marker2.innerHTML = `<img src="${import.meta.env.BASE_URL}ui/icon-ember.png" alt="">${tr(label)}`;
   }
 
   // Nom du lieu quand Happy y arrive
   showPlace(name: string, discovered: boolean): void {
-    this.placename.innerHTML = `${discovered ? '<small>Discovered</small>' : ''}${name}`;
+    this.placename.innerHTML = `${discovered ? `<small>${tr('Discovered')}</small>` : ''}${tr(name)}`;
     this.placename.classList.add('on');
     this.placeTimer = 3.2;
   }
@@ -67,18 +80,18 @@ export class Hud {
   }
 
   setPrompt(text: string | null): void {
-    this.prompt.textContent = text ?? '';
+    this.prompt.textContent = text ? tr(text) : '';
     this.prompt.classList.toggle('on', !!text);
   }
 
   say(text: string, seconds = 5): void {
-    this.subtitle.textContent = text;
+    this.subtitle.textContent = tr(text);
     this.subtitle.classList.add('on');
     this.subTimer = seconds;
   }
 
   objective(text: string): void {
-    this.toast.innerHTML = `<span>New objective</span>${text}`;
+    this.toast.innerHTML = `<span>${tr('New objective')}</span>${tr(text)}`;
     this.toast.classList.add('on');
     this.toastTimer = 4.5;
   }
@@ -90,6 +103,7 @@ export class Hud {
   }
 
   hideAll(): void {
+    this.setDealMarker(null);
     this.setPrompt(null);
     this.setTracker(null);
     this.setMarker(null);

@@ -364,3 +364,33 @@ canvas.flashback { filter: saturate(0.6) sepia(0.35) contrast(1.15); }
 .pv-look { background: rgba(239,233,220,0.07); }
 .pv-look p { font-size: 14px; }
 .pv-close { margin-top: 18px; padding: 8px 16px; border-radius: 18px; border: 1px solid rgba(239,233,220,0.3); background: none; color: #efe9dc; font: 12px system-ui; cursor: pointer; }
+
+.chant .qlife { display: flex; align-items: center; gap: 8px; justify-content: center; margin-top: 10px; }
+.chant .qlife b { font: 700 9px var(--sans); letter-spacing: 0.25em; color: #a89f92; }
+.chant .qlife > span { width: 160px; height: 5px; border-radius: 3px; background: rgba(255,90,58,0.18); overflow: hidden; }
+.chant .qlife > span > span { display: block; height: 100%; background: linear-gradient(90deg, #ff5a3a, #ffd27a); transition: width 0.3s; }
+
+.ph-lang { display: flex; justify-content: space-between; align-items: center; }
+.ph-seg { display: inline-flex; border-radius: 8px; overflow: hidden; border: 1px solid rgba(128,128,128,0.35); }
+.ph-seg button { padding: 4px 12px; border: 0; background: none; color: inherit; font: 600 12px system-ui; cursor: pointer; }
+.ph-seg button.on { background: #0a84ff; color: #fff; }
+
+.menu-lang { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.menu-lang .ph-seg button { color: #efe9dc; font-size: 13px; padding: 6px 12px; }
+.menu-lang .ph-seg button.on { background: #c8501e; }
+
+/* Fins illustrées et origine des proverbes */
+.go-pic { display: none; }
+#gameover.with-pic { display: flex; align-items: center; justify-content: center; flex-direction: row; gap: 40px; padding: 0 5vw; }
+#gameover.with-pic .go-pic { display: block; flex: 0 0 auto; width: min(56vw, 92vh); aspect-ratio: 4 / 3; border-radius: 10px; background-size: cover; background-position: center; box-shadow: 0 24px 70px rgba(0,0,0,0.75); animation: picIn 1.6s ease both; }
+#gameover.with-pic .go-inner { text-align: left; max-width: 440px; padding: 0; }
+#gameover.with-pic .go-line { font-size: 16px; }
+@keyframes picIn { from { opacity: 0; transform: scale(1.04); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+.go-origin { margin-top: 10px; font: 600 11px var(--sans); letter-spacing: 0.18em; text-transform: uppercase; color: #c8834a; }
+
+.ph-deal { margin: 10px 2px 0; padding: 8px 10px; border-left: 3px solid #8a2a1a; font: italic 12px/1.4 system-ui; opacity: 0.7; }
+
+/* Le repère rouge : la direction de Houngbo */
+.marker.deal { color: #ff8a7a; }
+.marker.deal img { filter: hue-rotate(-25deg) saturate(2.2) brightness(0.85) drop-shadow(0 0 8px rgba(220,20,20,0.9)); }
+body.cine .marker.deal { opacity: 0 !important; }

@@ -1,3 +1,4 @@
+import { tr } from './i18n';
 // Mise en scène : cinématiques (bandes noires, fondus, cartons de titre). Espace pour passer.
 export interface Scene {
   duration: number;
@@ -68,7 +69,7 @@ export class Director {
 
   // Carton de titre (« PROLOGUE — THE ROAD »)
   title(text: string, sub = '', seconds = 4): void {
-    this.card.innerHTML = `${sub ? `<small>${sub}</small>` : ''}${text}`;
+    this.card.innerHTML = `${sub ? `<small>${tr(sub)}</small>` : ''}${tr(text)}`;
     this.card.classList.add('on');
     this.cardTimer = seconds;
   }

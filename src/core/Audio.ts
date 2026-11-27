@@ -297,11 +297,18 @@ export class Audio {
   }
 
   /** Boucle (ambiance, feu, battement de cœur, musique) ; gain 0 = coupée. */
+  // boucles demandées avant que leur fichier soit chargé : elles démarrent dès qu'il arrive
+  private pending = new Map<string, { gain: number; path: string }>();
+
   loop(name: string, gain: number, path = `sfx/${name}.mp3`): void {
     const ctx = this.ctx;
     if (!ctx || !this.master) return;
     const buf = this.files.get(path);
     let l = this.loops.get(name);
+    if (!l && !buf) {
+      if (gain > 0.001) { if (!this.files.has(path)) void this.file(path); this.pending.set(name, { gain, path }); }
+      else this.pending.delete(name);
+    }
     if (!l && buf && gain > 0.001) {
       const src = ctx.createBufferSource();
       src.buffer = buf;
@@ -454,6 +461,7 @@ export class Audio {
   update(): void {
     const ctx = this.ctx;
     if (!ctx || !this.master || ctx.state !== 'running') return;
+    for (const [n, p] of this.pending) if (this.files.get(p.path)) { this.pending.delete(n); this.loop(n, p.gain, p.path); }
     if (ctx.currentTime > this.nextCricket) {
       this.cricket(ctx.currentTime);
       this.nextCricket = ctx.currentTime + 0.4 + Math.random() * 1.6;
