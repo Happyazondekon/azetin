@@ -19,6 +19,7 @@ import { buildAct2Props, type Pickup } from '../world/Act2Props';
 import type { FireHandle, Glow } from '../world/Fire';
 import { instance, type ModelName, type Models } from '../world/Assets';
 import { markEnding, endingsSeen } from '../ui/Endings';
+import { DEAD, DEAD_GOAL } from '../story/Dead';
 import { Credits } from '../ui/Credits';
 import { LAYER_SEEN, LAYER_TRUTH } from '../world/Village';
 import LINES from '../story/lines.json';
@@ -88,6 +89,7 @@ export class Game {
   private lensEl!: HTMLDivElement;
   private lensT = 0;
   private traces: { pk: Pickup; group: THREE.Group }[] = [];
+  private nameId = ''; private nameT = 0;
   private nearRay = new THREE.Ray(); private tmpA = new THREE.Vector3(); private tmpB = new THREE.Vector3(); private tmpC = new THREE.Vector3();
   private sparks: Sparks;
   private grab: { e: Enemy; presses: number; t: number } | null = null;
@@ -2280,7 +2282,7 @@ export class Game {
     const face = (p: Person | THREE.Object3D, to: THREE.Vector3) => { const o = 'root' in p ? p.root : p; o.rotation.y = Math.atan2(to.x - o.position.x, to.z - o.position.z); };
     // ---- les coups reçus
     const hit = (dmg: number, msg: string) => {
-      story.souffle -= dmg;
+      story.souffle -= hasFlag('namedAll') ? dmg * 0.5 : dmg; // les morts que Happy a nommés chantent avec lui
       this.lastHurt = this.time;
       this.hud.setDanger(Math.max(0, 1 - story.souffle / 100));
       r.shake = 0.55;
@@ -2742,7 +2744,7 @@ export class Game {
         end: () => {
           if (done) return;
           done = true;
-          void this.finalScreen('Ending IV — The Last Healer', ['The rite frees the souls. Mama Dossi and the villagers rise into the light. Houngbo is judged by the ancestors.',
+          void this.finalScreen('Ending IV — The Last Healer', [hasFlag('namedAll') ? 'The rite frees the souls. Called by their names, the dead of Azé-tin rise into the light one by one — Mama Dossi first. Houngbo is judged by the ancestors.' : 'The rite frees the souls. Mama Dossi and the villagers rise into the light. Houngbo is judged by the ancestors.',
             'Ayaba says goodbye. A shoot of iroko breaks through the stump of Loko.', 'Happy calls his mother: “I’m going to stay a little while.”', 'One year later, a car breaks down in front of the sign — repainted. A man with a calabash walks up, a lamp in his hand.'], true);
         },
       });
@@ -3032,6 +3034,7 @@ export class Game {
     this.mirror.update(dt, wantMirror, this.camera.position, this.player.yaw, this.player.pitch);
     this.updateLens(dt, locked);
     if (this.mirror.raised > 0.8 && !hasFlag('sawDossi')) this.checkDossiInMirror();
+    this.nameTheDead(dt);
 
     // Interaction (priorité : prise d'un Brûlé > choix > hibou > objet)
     const it = this.phone.open || this.grab || this.fb ? null : this.nearestInteractable();
@@ -3275,6 +3278,43 @@ export class Game {
       this.line('happy_mirror_ayaba', 7);
       this.save();
     }
+  }
+
+  // Connaître les morts : un Azévi gardé dans le rétroviseur ~1,3 s révèle son nom et sa mort (registre dans les Notes)
+  private nameTheDead(dt: number): void {
+    if (this.mirror.raised < 0.55 || !hasFlag('sawDossi') || this.mode !== 'playing') { this.nameT = Math.max(0, this.nameT - dt * 1.5); return; }
+    const fwd = this.player.forward(this.v1);
+    let best = '', bestDot = -0.9;
+    for (const id of Object.keys(DEAD)) {
+      const p = this.world.people[id];
+      if (!p || !p.root.visible || hasFlag('dead_' + id)) continue;
+      const d = this.v2.copy(p.root.position).sub(this.player.pos); d.y = 0;
+      const dist = d.length();
+      if (dist > 13 || dist < 0.5) continue;
+      const dot = (d.x * fwd.x + d.z * fwd.z) / dist;
+      if (dot < bestDot) { bestDot = dot; best = id; }
+    }
+    if (best !== this.nameId) { this.nameId = best; this.nameT = 0; }
+    if (!best) return;
+    this.nameT += dt;
+    if (this.nameT < 1.3) return;
+    this.nameId = ''; this.nameT = 0;
+    setFlag('dead_' + best);
+    const n = Object.keys(DEAD).filter((id) => hasFlag('dead_' + id)).length;
+    const dd = DEAD[best];
+    this.audio.sfx('whispers', { gain: 0.45 });
+    this.hud.say(`${dd.name} — ${tr(dd.text)}`, 6);
+    this.phone.notify('notes', 'The dead of Azé-tin', `${n} / ${DEAD_GOAL}`, 3);
+    if (n >= DEAD_GOAL && !hasFlag('namedAll')) {
+      setFlag('namedAll');
+      setTimeout(() => {
+        this.audio.sfx('souls', { gain: 0.6 });
+        this.hud.say('[Dah Agossou, from nowhere:] You have called them by their names. Now they will hear the rite — and walk with you.', 8);
+      }, 6500);
+    } else if (n === 1) {
+      setTimeout(() => this.hud.say('Each one has a name. The stele remembers them… and so will I. — Keep them in the mirror to learn who they were.', 7), 6500);
+    }
+    this.save();
   }
 
   // Mama Dossi est-elle dans le reflet ? (derrière Happy, à moins de 10 m)

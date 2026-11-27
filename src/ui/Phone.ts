@@ -2,6 +2,7 @@ import { tr, lang, setLang } from '../story/i18n';
 import { story, clockText, hasFlag } from '../story/State';
 import { PLACES, PATHS, STEPS, currentStep } from '../story/Places';
 import { endingsSeen, ENDINGS } from './Endings';
+import { DEAD, DEAD_GOAL } from '../story/Dead';
 
 // =============================================================
 //  Le smartphone de Happy (touche Tab). Un vrai téléphone : barre d'état, îlot,
@@ -358,7 +359,8 @@ export class Phone {
             : i === cur ? `<li class="now">${tr(st.text)}<small>${tr(st.hint)}</small></li>`
               : '').join('')}</ul>
           ${hasFlag('act2') && !hasFlag('ended') ? `<p class="ph-deal">${tr('Houngbo’s deal: burn the healer’s house (north, by the lagoon)… and he lets you leave.')}</p>` : ''}
-          <div class="ph-counts"><span>${tr('Parts for Kossi')} <b>${story.pieces}/3</b></span>${hasFlag('act1') ? `<span>${tr('Fragments')} <b>${story.secret}/5</b></span><span>${tr('Plants')} <b>${story.plantes}/3</b></span>` : ''}${hasFlag('calabash') ? `<span>Kaolin <b>${story.kaolin}/5</b></span>` : ''}</div></div>`;
+          <div class="ph-counts"><span>${tr('Parts for Kossi')} <b>${story.pieces}/3</b></span>${hasFlag('act1') ? `<span>${tr('Fragments')} <b>${story.secret}/5</b></span><span>${tr('Plants')} <b>${story.plantes}/3</b></span>` : ''}${hasFlag('calabash') ? `<span>Kaolin <b>${story.kaolin}/5</b></span>` : ''}${hasFlag('sawDossi') ? `<span>${tr('The dead')} <b>${Object.keys(DEAD).filter((id) => hasFlag('dead_' + id)).length}/${DEAD_GOAL}</b></span>` : ''}</div>
+          ${hasFlag('sawDossi') ? `<h5 class="ph-dead-h">${tr('The dead of Azé-tin')}</h5><p class="ph-sub">${tr('Hold the mirror on them (right click) to learn who they were.')}</p><ul class="ph-dead">${Object.entries(DEAD).map(([id, d]) => hasFlag('dead_' + id) ? `<li><b>${d.name}</b> ${tr(d.text)}</li>` : '<li class="unk">· · ·</li>').join('')}</ul>` : ''}</div>`;
         break;
       }
       case 'photos':
