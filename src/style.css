@@ -424,3 +424,14 @@ body.lens-up .tracker, body.lens-up .marker, body.lens-up .kaolin { opacity: 0 !
 .ph-dead li { padding: 5px 0; border-top: 1px solid rgba(255,255,255,0.06); color: rgba(239,233,220,0.8); }
 .ph-dead li b { display: block; color: var(--ember); letter-spacing: 0.12em; font-size: 11px; }
 .ph-dead li.unk { color: rgba(239,233,220,0.25); letter-spacing: 0.4em; }
+
+/* aide de premier usage (grosse touche qui pulse) */
+.coach { position: fixed; left: 50%; top: 66%; transform: translateX(-50%); display: flex; align-items: center; gap: 22px;
+  padding: 10px 20px; border-radius: 8px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,122,26,0.35);
+  opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 5; }
+.coach.on { opacity: 1; }
+.coach .cc { display: flex; align-items: center; gap: 10px; font: 600 14px var(--sans); letter-spacing: 0.05em; color: var(--kaolin); }
+.coach img.key { height: 54px; margin: 0; animation: tap 0.7s ease-in-out infinite; }
+.coach i { width: 1px; height: 40px; background: rgba(239,233,220,0.25); }
+@keyframes tap { 0%, 100% { transform: translateY(0) scale(1); filter: drop-shadow(0 0 0 rgba(255,122,26,0)); } 50% { transform: translateY(3px) scale(0.93); filter: drop-shadow(0 0 10px rgba(255,122,26,0.9)); } }
+body.cine .coach, body.lens-up .coach { opacity: 0 !important; }

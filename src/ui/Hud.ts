@@ -30,6 +30,8 @@ export class Hud {
   private placename: HTMLDivElement;
   private grab: HTMLDivElement;
   private kaolin: HTMLDivElement;
+  private coachEl: HTMLDivElement;
+  private coachKey = '';
   private placeTimer = 0;
   private subTimer = 0;
   private toastTimer = 0;
@@ -52,6 +54,7 @@ export class Hud {
     this.placename = el('placename');
     this.grab = el('grabbed');
     this.kaolin = el('kaolin');
+    this.coachEl = el('coach');
   }
 
   // Objectif en cours, toujours visible en haut à gauche
@@ -101,6 +104,15 @@ export class Hud {
     const html = text ? keyify(tr(text)) : '';
     if (this.prompt.innerHTML !== html) this.prompt.innerHTML = html;
     this.prompt.classList.toggle('on', !!text);
+  }
+
+  // Aide de premier usage : une grosse touche qui pulse au centre de l'écran (rétroviseur, attaque…)
+  coach(key: string | null, text = '', key2?: string, text2 = ''): void {
+    const id = key ? `${key}|${text}|${key2 ?? ''}` : '';
+    if (id === this.coachKey) return;
+    this.coachKey = id;
+    this.coachEl.classList.toggle('on', !!key);
+    if (key) this.coachEl.innerHTML = `${key2 ? `<div class="cc">${keyImg(key2)}<span>${tr(text2)}</span></div><i></i>` : ''}<div class="cc">${keyImg(key)}<span>${tr(text)}</span></div>`;
   }
 
   say(text: string, seconds = 5): void {

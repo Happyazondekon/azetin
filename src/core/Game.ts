@@ -3035,6 +3035,7 @@ export class Game {
     this.updateLens(dt, locked);
     if (this.mirror.raised > 0.8 && !hasFlag('sawDossi')) this.checkDossiInMirror();
     this.nameTheDead(dt);
+    this.coachHints(locked);
 
     // Interaction (priorité : prise d'un Brûlé > choix > hibou > objet)
     const it = this.phone.open || this.grab || this.fb ? null : this.nearestInteractable();
@@ -3072,6 +3073,7 @@ export class Game {
       this.attackCd = weapon.cooldown;
       this.player.stamina = Math.max(0, this.player.stamina - weapon.stamina);
       this.viewmodel.attack();
+      if (!hasFlag('struck')) setFlag('struck');
       this.audio.swoosh();
       setTimeout(() => {
         if (this.mode !== 'playing') return;
@@ -3278,6 +3280,30 @@ export class Game {
       this.line('happy_mirror_ayaba', 7);
       this.save();
     }
+  }
+
+  // Aides de premier usage : on montre la touche au bon moment, jusqu'à ce que le joueur l'ait faite
+  private coachHints(locked: boolean): void {
+    if (this.mode !== 'playing' || !locked || this.phone.open || this.fb || this.qte || this.grab) { this.hud.coach(null); return; }
+    // 1) le rétroviseur, devant l'étal de Mama Dossi
+    if (!hasFlag('sawDossi') && story.inventory.includes('Rear-view mirror') && hasFlag('patch')) {
+      const d = this.v2.copy(this.world.points.dossi).sub(this.player.pos); d.y = 0;
+      if (d.length() < 12) {
+        this.hud.coach(this.mirror.raised > 0.5 ? null : 'Right click', this.mirror.raised > 0.5 ? '' : 'Hold to raise the mirror — turn your back on her');
+        return;
+      }
+    }
+    // 2) la première attaque : un Brûlé ou un homme de cendre approche
+    if (!hasFlag('struck') && story.inventory.includes('Tire iron')) {
+      const p = this.player.pos;
+      const near = this.enemies.list.some((e) => e.pos.distanceTo(p) < 10) || this.statues.some((st) => st.p.root.visible && st.p.root.position.distanceTo(p) < 7);
+      if (near) {
+        if (!this.viewmodel.current) this.hud.coach('Left click', 'Tap to strike', '1', 'Take the tire iron');
+        else this.hud.coach('Left click', 'Tap, tap, tap — strike!');
+        return;
+      }
+    }
+    this.hud.coach(null);
   }
 
   // Connaître les morts : un Azévi gardé dans le rétroviseur ~1,3 s révèle son nom et sa mort (registre dans les Notes)
