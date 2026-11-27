@@ -614,8 +614,18 @@ export class Game {
         pos: p.kossi, range: 2.6,
         label: () => 'Talk to the vulcanizer',
         use: () => {
+          if (!hasFlag('trunk')) {
+            // sans les outils du coffre, Kossi n'a rien à réparer (et Happy serait sans défense)
+            this.hud.say('Kossi: A stranger, at this hour? If your car broke down, bring me what you have first — your tools, your spare. Check your trunk.', 6);
+            return;
+          }
           if (!hasFlag('kossi')) {
             setFlag('kossi');
+            if (!hasFlag('ayaba') && ayaba) {
+              // le joueur a trouvé Kossi tout seul : la petite fille l'attend déjà près de l'atelier
+              setFlag('ayaba');
+              ayaba.root.position.set(-12.5, 0, 10.2);
+            }
             this.line('kossi_1', 8);
             this.advance(20);
             this.setObjective('Bring Kossi two parts: an inner tube (the old moto-taxi, west) and a patch kit (Mama Dossi’s stall).');
@@ -682,6 +692,11 @@ export class Game {
         pos: p.dossi, range: 2.6,
         label: () => 'Talk to the woman at the stall',
         use: () => {
+          if (!hasFlag('kossi')) {
+            // tant que Kossi n'a rien demandé, Happy n'a aucune raison de s'arrêter ici
+            this.hud.say('A woman at a food stall watches you without blinking. A pot of akassa steams in front of her. — Happy: Not now. First I need to find someone who fixes tires.', 6);
+            return;
+          }
           if (!hasFlag('dossi')) {
             setFlag('dossi');
             this.line('dossi_1', 7);
@@ -3033,7 +3048,7 @@ export class Game {
     const wantMirror = this.lens < 0.3 && this.input.rightDown && locked && !this.phone.open && !this.fb && story.inventory.includes('Rear-view mirror');
     this.mirror.update(dt, wantMirror, this.camera.position, this.player.yaw, this.player.pitch);
     this.updateLens(dt, locked);
-    if (this.mirror.raised > 0.8 && !hasFlag('sawDossi')) this.checkDossiInMirror();
+    if (this.mirror.raised > 0.8 && !hasFlag('sawDossi') && hasFlag('patch')) this.checkDossiInMirror();
     this.nameTheDead(dt);
     this.coachHints(locked);
 

@@ -10,12 +10,13 @@ export function keyImg(k: string): string {
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const K = '(Tab|Space|Esc|Shift|[A-Z1-3])';
 // Remplace les touches citées dans un texte (déjà traduit) par leur image
-export function keyify(text: string): string {
-  return esc(text)
+export function keyify(text: string, list = false): string {
+  const t = esc(text)
     .replace(new RegExp(`(^|\\s{2,})${K} — `, 'g'), (_m, a, k) => `${a}${keyImg(k)} `)
     .replace(new RegExp(`\\b(Press|press|Hold|hold|Appuie sur|appuie sur|Maintiens|maintiens|Maintenez|maintenez)\\s+${K}(?![\\w’'])`, 'g'), (_m, w, k) => `${w} ${keyImg(k)}`)
-    .replace(new RegExp(`(^|·\\s)${K}(?=\\s)`, 'g'), (_m, a, k) => `${a}${keyImg(k)}`)
-    .replace(/(Right click|Clic droit|clic droit|right click)/g, (m) => keyImg(m));
+  // liste de commandes (« Tab téléphone · M carte… ») : chaque entrée commence par sa touche
+  const t2 = list ? t.replace(new RegExp(`(^|·\\s)${K}(?=\\s)`, 'g'), (_m, a, k) => `${a}${keyImg(k)}`) : t;
+  return t2.replace(/(Right click|Clic droit|clic droit|right click)/g, (m) => keyImg(m));
 }
 // Pas de HUD permanent : seulement l'invite d'interaction, les sous-titres,
 // l'annonce d'objectif et un voile qui rougit quand le souffle baisse.
@@ -60,7 +61,7 @@ export class Hud {
   // Objectif en cours, toujours visible en haut à gauche
   setTracker(step: string | null, text = '', keys = ''): void {
     this.tracker.style.opacity = step ? '1' : '0';
-    if (step) this.tracker.innerHTML = `<div class="t-step">${tr(step)}</div><div class="t-text">${tr(text)}</div><div class="t-keys">${keyify(tr(keys))}</div>`;
+    if (step) this.tracker.innerHTML = `<div class="t-step">${tr(step)}</div><div class="t-text">${tr(text)}</div><div class="t-keys">${keyify(tr(keys), true)}</div>`;
   }
 
   // Repère d'objectif à l'écran (x, y en pixels ; edge = hors champ, collé au bord)
