@@ -288,6 +288,15 @@ export class Game {
       const p = buildPerson(models, { ...look, id: `wardrobe${i}`, hair: hairs[(i >> 1) % hairs.length], shoe: shoes[(i >> 1) % shoes.length], top: tops[(i >> 1) % tops.length], gele: i === 3, azevi: i % 3 === 0 });
       if (p) zoo.add(p.root);
     }
+    // les décors des souvenirs (la fête, le dernier jour de Loko) : compilés d'avance, sinon l'écran reste noir le temps de la compilation
+    for (const [i, name] of (['az-throne', 'az-drum', 'az-barrels', 'az-lamp', 'tr-mango'] as const).entries()) {
+      const o = instance(models, name, 1);
+      if (o) { o.position.set(i * 3, 0, 0); zoo.add(o); }
+    }
+    const flagMat = new THREE.MeshStandardMaterial({ color: 0xc0201a, roughness: 0.8, side: THREE.DoubleSide, emissive: 0xc0201a, emissiveIntensity: 0.15 });
+    const flag = new THREE.Mesh(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-0.13, 0, 0), new THREE.Vector3(0.13, 0, 0), new THREE.Vector3(0, -0.32, 0)]), flagMat);
+    flag.geometry.computeVertexNormals();
+    zoo.add(flag);
     this.scene.add(zoo);
     await this.warmup(this.scene);
     this.scene.remove(zoo);
@@ -1555,7 +1564,9 @@ export class Game {
     const people: Person[] = [];
     const stump = this.scene.children.find((o) => Math.abs(o.position.x) < 0.1 && Math.abs(o.position.z + 20) < 0.1 && o.position.y === 0);
     const minutes = story.minutes;
+    const glows: Glow[] = [];
     this.director.fadeTo(1, 0.6);
+    setTimeout(() => this.director.title('TEN YEARS AGO', 'THE LAST DAY OF LOKO', 4), 300);
     setTimeout(() => {
       // l'iroko, immense
       const tree = instance(this.models, 'tr-mango', 2.2);
@@ -1563,12 +1574,8 @@ export class Game {
       if (stump) stump.visible = false;
       this.hornbill.visible = false;
       // la lumière chaude d'une fin d'après-midi, de face : on doit voir les visages
-      const key = new THREE.PointLight(0xffc48a, 90, 26, 1.6);
-      key.position.set(3.5, 4.5, -10.5);
-      const rim = new THREE.PointLight(0xff8a4a, 40, 18, 1.6);
-      rim.position.set(-4, 3, -15);
-      this.scene.add(key, rim);
-      added.push(key, rim);
+      // (jamais de nouvelle lumière : les lueurs du réservoir de lumières, sinon tous les shaders se recompilent)
+      glows.push(w.fx.addGlow(new THREE.Vector3(3.5, 4.5, -10.5), 0xffc48a, 90, 26), w.fx.addGlow(new THREE.Vector3(-4, 3, -15), 0xff8a4a, 40, 18));
       const ag = buildPerson(this.models, { id: 'agossou_fb', sex: 'm', height: 1.74, skin: '#3a2618', top: 'bomba', wax: ['#efe9dc', '#d8d0c0', '#c8bfae'],
         pants: '#e8e2d4', beard: true, azevi: false, pose: 'Idle_Talking_Loop' });
       if (ag) { ag.root.position.set(0, 0, -17.6); ag.root.rotation.y = 0; this.scene.add(ag.root); added.push(ag.root); people.push(ag); }
@@ -1586,7 +1593,6 @@ export class Game {
       this.renderer.domElement.classList.add('flashback');
       this.audio.loop('drone', 0);
       this.director.fadeTo(0, 1.2);
-      this.director.title('TEN YEARS AGO', 'THE LAST DAY OF LOKO', 3.5);
       const fired = new Set<string>();
       const at = (k: string, t: number, now: number, f: () => void) => { if (now >= t && !fired.has(k)) { fired.add(k); f(); } };
       let done = false;
@@ -1617,6 +1623,7 @@ export class Game {
           if (done) return;
           done = true;
           for (const o of added) this.scene.remove(o);
+          for (const g of glows) w.fx.removeGlow(g);
           if (stump) stump.visible = true;
           this.hornbill.visible = true;
           if (h && hv) { h.root.position.copy(hv.p); h.root.rotation.y = hv.r; h.root.visible = hv.v; }
@@ -1627,7 +1634,6 @@ export class Game {
           after();
         },
       }, false);
-      void w;
     }, 700);
   }
 
@@ -1661,6 +1667,10 @@ export class Game {
     this.audio.loop('tension', 0, 'music/tension.mp3');
     this.director.fadeTo(1, 1.2);
     this.audio.sfx('stinger3', { gain: 0.6 });
+    // l'écran noir n'est jamais vide : le titre du souvenir apparaît tout de suite, la fête se fait entendre au loin
+    this.hud.hideAll();
+    setTimeout(() => this.director.title('TEN YEARS AGO', 'THE NIGHT OF THE FIRE', 7), 500);
+    setTimeout(() => this.audio.loop('festival', 0.3), 700);
     setTimeout(() => {
       const light = this.world.fx.addGlow(new THREE.Vector3(38, 8, -5), 0xffa040, 0, 120);
       this.fb = { t: 0, ran: false, back: [this.player.pos.x, this.player.pos.z, this.player.yaw], weapon: this.viewmodel.current, light, done: false };
@@ -1795,7 +1805,7 @@ export class Game {
     const lampFires: FireHandle[] = [];
     let done = false;
     this.director.fadeTo(0, 2);
-    this.director.title('TEN YEARS AGO', 'THE NIGHT OF THE FIRE', 5);
+    this.director.title('TEN YEARS AGO', 'THE NIGHT OF THE FIRE', 4.5); // déjà affiché pendant le noir : il reste, puis s'efface
     this.director.play({
       duration: 33,
       update: (t, dt) => {
