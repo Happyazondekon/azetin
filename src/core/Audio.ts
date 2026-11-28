@@ -280,7 +280,7 @@ export class Audio {
   }
 
   /** Réplique enregistrée (public/voices/lines/<id>.mp3). Retourne sa durée, ou 0 si le fichier manque. */
-  // le texte exact de chaque voix enregistrée : une voix dont la réplique a été réécrite depuis n'est plus jouée
+  // le texte exact de chaque voix enregistrée (pour savoir si une voix française à jour existe)
   private lineRec?: Promise<Record<string, string>>;
   // fr : le texte français ; s'il existe une voix française à jour (voices/lines/fr), elle est jouée en priorité
   async playLine(id: string, opts: { gain?: number; pan?: number; ghost?: boolean; radio?: boolean; text?: string; fr?: string; who?: string } = {}): Promise<number> {
@@ -288,8 +288,9 @@ export class Audio {
     if (opts.text || opts.fr) {
       this.lineRec ??= fetch(`${import.meta.env.BASE_URL}voices/lines/_texts.json`).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
       const rec = await this.lineRec;
+      // la voix française, si elle a été générée pour ce texte ; sinon la voix anglaise
+      // (même si la réplique a été réécrite depuis : l'ancienne voix vaut mieux qu'un murmure, en attendant generer-voix.bat)
       if (opts.fr && rec[`fr:${id}`] === opts.fr && (await this.file(`voices/lines/fr/${id}.mp3`))) path = `voices/lines/fr/${id}.mp3`;
-      else if (opts.text && rec[id] !== undefined && rec[id] !== opts.text) return 0;
     }
     const buf = await this.file(path);
     if (!buf || !this.ctx) return 0;
