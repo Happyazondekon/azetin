@@ -507,7 +507,7 @@ export class Game {
       else if (p) this.audio.voiceMix(text, p.def.child ? 'c' : p.def.sex, { gain, pan, ghost: p.def.azevi, rate: p.def.child ? 1.05 : 1 });
     };
     if (!id) return fallback();
-    void this.audio.playLine(id, { gain, pan, ghost: !!p?.def.azevi, radio: who === 'radio', text }).then((dur) => {
+    void this.audio.playLine(id, { gain, pan, ghost: !!p?.def.azevi, radio: who === 'radio', text, who, fr: lang() === 'fr' ? (LINES as Record<string, { fr?: string }>)[id]?.fr : undefined }).then((dur) => {
       if (!dur) fallback();
       else if (boxed === undefined && dur + 0.6 > seconds) this.subtitles(name, shown, dur + 0.6); // le sous-titre suit la durée de la voix
     });

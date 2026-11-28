@@ -233,7 +233,7 @@ export class Audio {
   }
 
   // Chaîne d'effet : voix d'Azévi (voilée + écho) ou radio (bande étroite + souffle)
-  private chain(kind: 'dry' | 'ghost' | 'radio', gain: number, pan: number): AudioNode {
+  private chain(kind: 'dry' | 'ghost' | 'radio' | 'chief' | 'healer', gain: number, pan: number): AudioNode {
     const ctx = this.ctx!;
     const g = ctx.createGain();
     g.gain.value = gain;
@@ -246,6 +246,27 @@ export class Audio {
       f.type = 'bandpass'; f.frequency.value = 1500; f.Q.value = 0.9;
       f.connect(g);
       return f;
+    }
+    if (kind === 'chief' || kind === 'healer') {
+      // Houngbo : graves renforcés et grande salle sombre ; Dah Agossou : chaleur et halo doux, comme un esprit protecteur
+      const low = ctx.createBiquadFilter();
+      low.type = 'lowshelf'; low.frequency.value = 200; low.gain.value = kind === 'chief' ? 7 : 3;
+      f.type = 'lowpass'; f.frequency.value = kind === 'chief' ? 4200 : 6500;
+      const d1 = ctx.createDelay(1), d2 = ctx.createDelay(1);
+      d1.delayTime.value = kind === 'chief' ? 0.09 : 0.14;
+      d2.delayTime.value = kind === 'chief' ? 0.27 : 0.33;
+      const fb1 = ctx.createGain(), fb2 = ctx.createGain();
+      fb1.gain.value = kind === 'chief' ? 0.32 : 0.18;
+      fb2.gain.value = kind === 'chief' ? 0.28 : 0.2;
+      const wet = ctx.createGain();
+      wet.gain.value = kind === 'chief' ? 0.55 : 0.4;
+      low.connect(f);
+      f.connect(g);
+      f.connect(d1).connect(fb1).connect(d1);
+      f.connect(d2).connect(fb2).connect(d2);
+      fb1.connect(wet); fb2.connect(wet);
+      wet.connect(g);
+      return low;
     }
     f.type = 'lowpass'; f.frequency.value = 5200;
     const d = ctx.createDelay(1);
@@ -261,19 +282,24 @@ export class Audio {
   /** Réplique enregistrée (public/voices/lines/<id>.mp3). Retourne sa durée, ou 0 si le fichier manque. */
   // le texte exact de chaque voix enregistrée : une voix dont la réplique a été réécrite depuis n'est plus jouée
   private lineRec?: Promise<Record<string, string>>;
-  async playLine(id: string, opts: { gain?: number; pan?: number; ghost?: boolean; radio?: boolean; text?: string } = {}): Promise<number> {
-    if (opts.text) {
-      this.lineRec ??= fetch('voices/lines/_texts.json').then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+  // fr : le texte français ; s'il existe une voix française à jour (voices/lines/fr), elle est jouée en priorité
+  async playLine(id: string, opts: { gain?: number; pan?: number; ghost?: boolean; radio?: boolean; text?: string; fr?: string; who?: string } = {}): Promise<number> {
+    let path = `voices/lines/${id}.mp3`;
+    if (opts.text || opts.fr) {
+      this.lineRec ??= fetch(`${import.meta.env.BASE_URL}voices/lines/_texts.json`).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
       const rec = await this.lineRec;
-      if (rec[id] !== undefined && rec[id] !== opts.text) return 0;
+      if (opts.fr && rec[`fr:${id}`] === opts.fr && (await this.file(`voices/lines/fr/${id}.mp3`))) path = `voices/lines/fr/${id}.mp3`;
+      else if (opts.text && rec[id] !== undefined && rec[id] !== opts.text) return 0;
     }
-    const buf = await this.file(`voices/lines/${id}.mp3`);
+    const buf = await this.file(path);
     if (!buf || !this.ctx) return 0;
     if (opts.gain === 0) return buf.duration; // simple mesure de durée
     const src = this.ctx.createBufferSource();
     src.buffer = buf;
-    if (opts.ghost) src.playbackRate.value = 0.94;
-    src.connect(this.chain(opts.radio ? 'radio' : opts.ghost ? 'ghost' : 'dry', opts.gain ?? 1, opts.pan ?? 0));
+    const kind = opts.radio ? 'radio' : opts.who === 'houngbo' ? 'chief' : opts.who === 'agossou' ? 'healer' : opts.ghost ? 'ghost' : 'dry';
+    if (kind === 'chief') src.playbackRate.value = 0.95; // encore un peu plus grave
+    else if (kind === 'ghost') src.playbackRate.value = 0.94;
+    src.connect(this.chain(kind, opts.gain ?? 1, opts.pan ?? 0));
     src.start();
     this.lastLine = src;
     src.onended = () => { if (this.lastLine === src) this.lastLine = null; };

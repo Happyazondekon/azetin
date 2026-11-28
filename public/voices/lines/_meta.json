@@ -1,0 +1,842 @@
+{
+ "prologue_call": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[cheerful, then alarmed]",
+  "model": "eleven_v4"
+ },
+ "fr:prologue_call": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[cheerful, then alarmed]",
+  "model": "eleven_v4"
+ },
+ "prologue_flat": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[frustrated] [sighs]",
+  "model": "eleven_v4"
+ },
+ "fr:prologue_flat": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[frustrated] [sighs]",
+  "model": "eleven_v4"
+ },
+ "trunk": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "fr:trunk": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "road_call": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "fr:road_call": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "road_gone": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "fr:road_gone": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "ayaba_appear": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[whispers]",
+  "model": "eleven_v4"
+ },
+ "fr:ayaba_appear": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[whispers]",
+  "model": "eleven_v4"
+ },
+ "ayaba_1": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[softly]",
+  "model": "eleven_v4"
+ },
+ "fr:ayaba_1": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[softly]",
+  "model": "eleven_v4"
+ },
+ "ayaba_mirror": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[softly]",
+  "model": "eleven_v4"
+ },
+ "fr:ayaba_mirror": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[softly]",
+  "model": "eleven_v4"
+ },
+ "ayaba_know": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[softly]",
+  "model": "eleven_v4"
+ },
+ "fr:ayaba_know": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[softly]",
+  "model": "eleven_v4"
+ },
+ "ayaba_owl": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[softly]",
+  "model": "eleven_v4"
+ },
+ "fr:ayaba_owl": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[softly]",
+  "model": "eleven_v4"
+ },
+ "ayaba_grandpa": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[softly]",
+  "model": "eleven_v4"
+ },
+ "fr:ayaba_grandpa": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[softly]",
+  "model": "eleven_v4"
+ },
+ "ayaba_station": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[whispers] [scared]",
+  "model": "eleven_v4"
+ },
+ "fr:ayaba_station": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[whispers] [scared]",
+  "model": "eleven_v4"
+ },
+ "kossi_1": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[gruff, tired]",
+  "model": "eleven_v4"
+ },
+ "fr:kossi_1": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[gruff, tired]",
+  "model": "eleven_v4"
+ },
+ "kossi_story": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[quietly] [haunted]",
+  "model": "eleven_v4"
+ },
+ "fr:kossi_story": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[quietly] [haunted]",
+  "model": "eleven_v4"
+ },
+ "kossi_nag": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[gruff, tired]",
+  "model": "eleven_v4"
+ },
+ "fr:kossi_nag": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[gruff, tired]",
+  "model": "eleven_v4"
+ },
+ "kossi_act1": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[gruff, tired]",
+  "model": "eleven_v4"
+ },
+ "fr:kossi_act1": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[gruff, tired]",
+  "model": "eleven_v4"
+ },
+ "kossi_repaired": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[gruff, tired]",
+  "model": "eleven_v4"
+ },
+ "fr:kossi_repaired": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[gruff, tired]",
+  "model": "eleven_v4"
+ },
+ "kossi_why": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[tired]",
+  "model": "eleven_v4"
+ },
+ "fr:kossi_why": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[tired]",
+  "model": "eleven_v4"
+ },
+ "kossi_mad": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[shouts] [furious]",
+  "model": "eleven_v4"
+ },
+ "fr:kossi_mad": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[shouts] [furious]",
+  "model": "eleven_v4"
+ },
+ "dossi_1": {
+  "voice": "4SFJvuIUvxaPLgk8FoK3",
+  "tag": "[sweetly] [unsettling]",
+  "model": "eleven_v4"
+ },
+ "fr:dossi_1": {
+  "voice": "4SFJvuIUvxaPLgk8FoK3",
+  "tag": "[sweetly] [unsettling]",
+  "model": "eleven_v4"
+ },
+ "dossi_ate": {
+  "voice": "4SFJvuIUvxaPLgk8FoK3",
+  "tag": "[satisfied] [unsettling]",
+  "model": "eleven_v4"
+ },
+ "fr:dossi_ate": {
+  "voice": "4SFJvuIUvxaPLgk8FoK3",
+  "tag": "[satisfied] [unsettling]",
+  "model": "eleven_v4"
+ },
+ "dossi_refuse": {
+  "voice": "4SFJvuIUvxaPLgk8FoK3",
+  "tag": "[cold]",
+  "model": "eleven_v4"
+ },
+ "fr:dossi_refuse": {
+  "voice": "4SFJvuIUvxaPLgk8FoK3",
+  "tag": "[cold]",
+  "model": "eleven_v4"
+ },
+ "dossi_stare": {
+  "voice": "4SFJvuIUvxaPLgk8FoK3",
+  "tag": "[sweetly] [unsettling]",
+  "model": "eleven_v4"
+ },
+ "fr:dossi_stare": {
+  "voice": "4SFJvuIUvxaPLgk8FoK3",
+  "tag": "[sweetly] [unsettling]",
+  "model": "eleven_v4"
+ },
+ "dossi_know": {
+  "voice": "4SFJvuIUvxaPLgk8FoK3",
+  "tag": "[whispers] [sinister]",
+  "model": "eleven_v4"
+ },
+ "fr:dossi_know": {
+  "voice": "4SFJvuIUvxaPLgk8FoK3",
+  "tag": "[whispers] [sinister]",
+  "model": "eleven_v4"
+ },
+ "happy_tube": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "fr:happy_tube": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "happy_ate": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[uneasy]",
+  "model": "eleven_v4"
+ },
+ "fr:happy_ate": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[uneasy]",
+  "model": "eleven_v4"
+ },
+ "happy_patch": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "fr:happy_patch": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "happy_mirror_dossi": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[horrified] [whispers]",
+  "model": "eleven_v4"
+ },
+ "fr:happy_mirror_dossi": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[horrified] [whispers]",
+  "model": "eleven_v4"
+ },
+ "happy_mirror_ayaba": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[shocked] [softly]",
+  "model": "eleven_v4"
+ },
+ "fr:happy_mirror_ayaba": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[shocked] [softly]",
+  "model": "eleven_v4"
+ },
+ "happy_battery": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "fr:happy_battery": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "happy_flash_dead": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "fr:happy_flash_dead": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "happy_flash_low": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "fr:happy_flash_low": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "happy_free": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[shouts]",
+  "model": "eleven_v4"
+ },
+ "fr:happy_free": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[shouts]",
+  "model": "eleven_v4"
+ },
+ "happy_wake": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[out of breath] [shaken]",
+  "model": "eleven_v4"
+ },
+ "fr:happy_wake": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[out of breath] [shaken]",
+  "model": "eleven_v4"
+ },
+ "happy_plaza": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "fr:happy_plaza": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "happy_behind": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[panicked]",
+  "model": "eleven_v4"
+ },
+ "fr:happy_behind": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[panicked]",
+  "model": "eleven_v4"
+ },
+ "happy_notyet": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[determined] [out of breath]",
+  "model": "eleven_v4"
+ },
+ "fr:happy_notyet": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[determined] [out of breath]",
+  "model": "eleven_v4"
+ },
+ "radio_news": {
+  "voice": "HbDa7eEZNGkUODgNzru6",
+  "tag": "[news anchor] [solemn]",
+  "model": "eleven_v4"
+ },
+ "fr:radio_news": {
+  "voice": "HbDa7eEZNGkUODgNzru6",
+  "tag": "[news anchor] [solemn]",
+  "model": "eleven_v4"
+ },
+ "kossi_machete_ask": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[gruff, tired]",
+  "model": "eleven_v4"
+ },
+ "fr:kossi_machete_ask": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[gruff, tired]",
+  "model": "eleven_v4"
+ },
+ "kossi_machete_took": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[gruff, tired]",
+  "model": "eleven_v4"
+ },
+ "fr:kossi_machete_took": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[gruff, tired]",
+  "model": "eleven_v4"
+ },
+ "happy_hornbill": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "fr:happy_hornbill": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "ayaba_stump": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[softly]",
+  "model": "eleven_v4"
+ },
+ "fr:ayaba_stump": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[softly]",
+  "model": "eleven_v4"
+ },
+ "agossou_stump": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[softly] [ancient, solemn]",
+  "model": "eleven_v4"
+ },
+ "fr:agossou_stump": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[softly] [ancient, solemn]",
+  "model": "eleven_v4"
+ },
+ "agossou_calabash": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[calm] [gentle, wise]",
+  "model": "eleven_v4"
+ },
+ "fr:agossou_calabash": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[calm] [gentle, wise]",
+  "model": "eleven_v4"
+ },
+ "agossou_tape": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[angry] [shouting]",
+  "model": "eleven_v4"
+ },
+ "fr:agossou_tape": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[angry] [shouting]",
+  "model": "eleven_v4"
+ },
+ "agossou_flash": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[shouts] [desperate]",
+  "model": "eleven_v4"
+ },
+ "fr:agossou_flash": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[shouts] [desperate]",
+  "model": "eleven_v4"
+ },
+ "agossou_plants": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[calm] [wise]",
+  "model": "eleven_v4"
+ },
+ "fr:agossou_plants": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[calm] [wise]",
+  "model": "eleven_v4"
+ },
+ "happy_frag_photo": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "fr:happy_frag_photo": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "happy_frag_notebook": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "fr:happy_frag_notebook": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "happy_frag_register": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "fr:happy_frag_register": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "happy_frag_drawing": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "fr:happy_frag_drawing": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "happy_frag_tape": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "fr:happy_frag_tape": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "happy_plant": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "fr:happy_plant": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "ayaba_flash_end": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[sadly] [softly]",
+  "model": "eleven_v4"
+ },
+ "fr:ayaba_flash_end": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[sadly] [softly]",
+  "model": "eleven_v4"
+ },
+ "flash_party": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[excited] [childlike]",
+  "model": "eleven_v4"
+ },
+ "fr:flash_party": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[excited] [childlike]",
+  "model": "eleven_v4"
+ },
+ "houngbo_offer": {
+  "voice": "hTAkB84vcg7DBqjr3hay",
+  "tag": "[warm, then menacing] [slow, deep voice]",
+  "model": "eleven_v4"
+ },
+ "fr:houngbo_offer": {
+  "voice": "hTAkB84vcg7DBqjr3hay",
+  "tag": "[warm, then menacing] [slow, deep voice]",
+  "model": "eleven_v4"
+ },
+ "houngbo_midnight": {
+  "voice": "hTAkB84vcg7DBqjr3hay",
+  "tag": "[whispers menacingly] [deep voice]",
+  "model": "eleven_v4"
+ },
+ "fr:houngbo_midnight": {
+  "voice": "hTAkB84vcg7DBqjr3hay",
+  "tag": "[whispers menacingly] [deep voice]",
+  "model": "eleven_v4"
+ },
+ "happy_crown": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[horrified] [whispers]",
+  "model": "eleven_v4"
+ },
+ "fr:happy_crown": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[horrified] [whispers]",
+  "model": "eleven_v4"
+ },
+ "kossi_after": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[gruff, tired]",
+  "model": "eleven_v4"
+ },
+ "fr:kossi_after": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[gruff, tired]",
+  "model": "eleven_v4"
+ },
+ "agossou_feast": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[bitter] [quietly]",
+  "model": "eleven_v4"
+ },
+ "fr:agossou_feast": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[bitter] [quietly]",
+  "model": "eleven_v4"
+ },
+ "houngbo_feast": {
+  "voice": "hTAkB84vcg7DBqjr3hay",
+  "tag": "[booming] [laughing, drunk]",
+  "model": "eleven_v4"
+ },
+ "fr:houngbo_feast": {
+  "voice": "hTAkB84vcg7DBqjr3hay",
+  "tag": "[booming] [laughing, drunk]",
+  "model": "eleven_v4"
+ },
+ "houngbo_thanks": {
+  "voice": "hTAkB84vcg7DBqjr3hay",
+  "tag": "[sinister calm] [deep voice]",
+  "model": "eleven_v4"
+ },
+ "fr:houngbo_thanks": {
+  "voice": "hTAkB84vcg7DBqjr3hay",
+  "tag": "[sinister calm] [deep voice]",
+  "model": "eleven_v4"
+ },
+ "happy_burn": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[sadly] [quietly]",
+  "model": "eleven_v4"
+ },
+ "fr:happy_burn": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[sadly] [quietly]",
+  "model": "eleven_v4"
+ },
+ "agossou_rite": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[urgent] [firm]",
+  "model": "eleven_v4"
+ },
+ "fr:agossou_rite": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[urgent] [firm]",
+  "model": "eleven_v4"
+ },
+ "houngbo_rite1": {
+  "voice": "hTAkB84vcg7DBqjr3hay",
+  "tag": "[furious] [shouts]",
+  "model": "eleven_v4"
+ },
+ "fr:houngbo_rite1": {
+  "voice": "hTAkB84vcg7DBqjr3hay",
+  "tag": "[furious] [shouts]",
+  "model": "eleven_v4"
+ },
+ "houngbo_rite2": {
+  "voice": "hTAkB84vcg7DBqjr3hay",
+  "tag": "[whispers] [cruel, deep voice]",
+  "model": "eleven_v4"
+ },
+ "fr:houngbo_rite2": {
+  "voice": "hTAkB84vcg7DBqjr3hay",
+  "tag": "[whispers] [cruel, deep voice]",
+  "model": "eleven_v4"
+ },
+ "houngbo_rite3": {
+  "voice": "hTAkB84vcg7DBqjr3hay",
+  "tag": "[snarling] [menacing]",
+  "model": "eleven_v4"
+ },
+ "fr:houngbo_rite3": {
+  "voice": "hTAkB84vcg7DBqjr3hay",
+  "tag": "[snarling] [menacing]",
+  "model": "eleven_v4"
+ },
+ "chant_1": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[chanting slowly] [solemn]",
+  "model": "eleven_v4"
+ },
+ "fr:chant_1": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[chanting slowly] [solemn]",
+  "model": "eleven_v4"
+ },
+ "chant_2": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[chanting slowly] [solemn]",
+  "model": "eleven_v4"
+ },
+ "fr:chant_2": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[chanting slowly] [solemn]",
+  "model": "eleven_v4"
+ },
+ "chant_3": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[chanting] [hopeful]",
+  "model": "eleven_v4"
+ },
+ "fr:chant_3": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[chanting] [hopeful]",
+  "model": "eleven_v4"
+ },
+ "houngbo_judged": {
+  "voice": "hTAkB84vcg7DBqjr3hay",
+  "tag": "[terrified] [screaming]",
+  "model": "eleven_v4"
+ },
+ "fr:houngbo_judged": {
+  "voice": "hTAkB84vcg7DBqjr3hay",
+  "tag": "[terrified] [screaming]",
+  "model": "eleven_v4"
+ },
+ "ayaba_goodbye": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[softly] [relieved]",
+  "model": "eleven_v4"
+ },
+ "fr:ayaba_goodbye": {
+  "voice": "LFo5X4P9PhYaOLBA9Hyh",
+  "tag": "[softly] [relieved]",
+  "model": "eleven_v4"
+ },
+ "happy_mom": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[emotional] [softly]",
+  "model": "eleven_v4"
+ },
+ "fr:happy_mom": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[emotional] [softly]",
+  "model": "eleven_v4"
+ },
+ "happy_postcredit": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "fr:happy_postcredit": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "",
+  "model": "eleven_v4"
+ },
+ "happy_dawn": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[panicked]",
+  "model": "eleven_v4"
+ },
+ "fr:happy_dawn": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[panicked]",
+  "model": "eleven_v4"
+ },
+ "kossi_wait": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[gruff, tired]",
+  "model": "eleven_v4"
+ },
+ "fr:kossi_wait": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[gruff, tired]",
+  "model": "eleven_v4"
+ },
+ "kossi_ask": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[serious] [quietly]",
+  "model": "eleven_v4"
+ },
+ "fr:kossi_ask": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[serious] [quietly]",
+  "model": "eleven_v4"
+ },
+ "kossi_leave_ok": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[disappointed]",
+  "model": "eleven_v4"
+ },
+ "fr:kossi_leave_ok": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[disappointed]",
+  "model": "eleven_v4"
+ },
+ "kossi_rite_explain": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[serious] [urgent]",
+  "model": "eleven_v4"
+ },
+ "fr:kossi_rite_explain": {
+  "voice": "cEjGxRhK5rId1bacJPJr",
+  "tag": "[serious] [urgent]",
+  "model": "eleven_v4"
+ },
+ "happy_car_doubt": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[hesitant] [quietly]",
+  "model": "eleven_v4"
+ },
+ "fr:happy_car_doubt": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[hesitant] [quietly]",
+  "model": "eleven_v4"
+ },
+ "agossou_warn": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[sadly] [gentle]",
+  "model": "eleven_v4"
+ },
+ "fr:agossou_warn": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[sadly] [gentle]",
+  "model": "eleven_v4"
+ },
+ "agossou_forbid": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[shouts] [desperate]",
+  "model": "eleven_v4"
+ },
+ "fr:agossou_forbid": {
+  "voice": "iO2yRDDEMGGWihKhxPcV",
+  "tag": "[shouts] [desperate]",
+  "model": "eleven_v4"
+ },
+ "houngbo_cut": {
+  "voice": "hTAkB84vcg7DBqjr3hay",
+  "tag": "[cold] [quietly, deep voice]",
+  "model": "eleven_v4"
+ },
+ "fr:houngbo_cut": {
+  "voice": "hTAkB84vcg7DBqjr3hay",
+  "tag": "[cold] [quietly, deep voice]",
+  "model": "eleven_v4"
+ },
+ "happy_forbid_after": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[shaken] [quietly]",
+  "model": "eleven_v4"
+ },
+ "fr:happy_forbid_after": {
+  "voice": "ojsdYNTmnPdf7yAl8rI5",
+  "tag": "[shaken] [quietly]",
+  "model": "eleven_v4"
+ }
+}
