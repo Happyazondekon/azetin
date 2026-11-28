@@ -32,6 +32,7 @@ export class Hud {
   private grab: HTMLDivElement;
   private kaolin: HTMLDivElement;
   private coachEl: HTMLDivElement;
+  private dialogEl: HTMLDivElement;
   private coachKey = '';
   private placeTimer = 0;
   private subTimer = 0;
@@ -56,6 +57,7 @@ export class Hud {
     this.grab = el('grabbed');
     this.kaolin = el('kaolin');
     this.coachEl = el('coach');
+    this.dialogEl = el('dialog');
   }
 
   // Objectif en cours, toujours visible en haut à gauche
@@ -132,6 +134,21 @@ export class Hud {
   setDanger(v: number): void {
     this.veil.style.opacity = String(0.35 + v * 0.65);
     this.veil.style.setProperty('--red', String(v));
+  }
+
+  // Dialogue important : une boîte avec le portrait du personnage, qui attend que le joueur appuie sur E
+  showDialog(name: string, text: string, portrait: string | null, page: number, pages: number): void {
+    const img = portrait ? `<img class="dl-face" src="${import.meta.env.BASE_URL}ui/portraits/${portrait}.jpg" alt="">` : '';
+    const dots = pages > 1 ? `<span class="dl-pages">${Array.from({ length: pages }, (_, i) => `<i${i === page ? ' class="on"' : ''}></i>`).join('')}</span>` : '';
+    this.dialogEl.innerHTML = `${img}<div class="dl-body"><b>${esc(tr(name))}</b><p>${esc(text)}</p>
+      <small class="dl-next">${dots}${keyImg('E')}<span>${tr(page < pages - 1 ? 'Next' : 'Continue')}</span></small></div>`;
+    this.dialogEl.classList.add('on');
+    this.subtitle.classList.remove('on');
+    this.subTimer = 0;
+  }
+
+  hideDialog(): void {
+    this.dialogEl.classList.remove('on');
   }
 
   hideAll(): void {

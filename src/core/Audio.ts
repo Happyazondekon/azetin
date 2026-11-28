@@ -259,15 +259,59 @@ export class Audio {
   }
 
   /** Réplique enregistrée (public/voices/lines/<id>.mp3). Retourne sa durée, ou 0 si le fichier manque. */
-  async playLine(id: string, opts: { gain?: number; pan?: number; ghost?: boolean; radio?: boolean } = {}): Promise<number> {
+  // le texte exact de chaque voix enregistrée : une voix dont la réplique a été réécrite depuis n'est plus jouée
+  private lineRec?: Promise<Record<string, string>>;
+  async playLine(id: string, opts: { gain?: number; pan?: number; ghost?: boolean; radio?: boolean; text?: string } = {}): Promise<number> {
+    if (opts.text) {
+      this.lineRec ??= fetch('voices/lines/_texts.json').then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+      const rec = await this.lineRec;
+      if (rec[id] !== undefined && rec[id] !== opts.text) return 0;
+    }
     const buf = await this.file(`voices/lines/${id}.mp3`);
     if (!buf || !this.ctx) return 0;
+    if (opts.gain === 0) return buf.duration; // simple mesure de durée
     const src = this.ctx.createBufferSource();
     src.buffer = buf;
     if (opts.ghost) src.playbackRate.value = 0.94;
     src.connect(this.chain(opts.radio ? 'radio' : opts.ghost ? 'ghost' : 'dry', opts.gain ?? 1, opts.pan ?? 0));
     src.start();
+    this.lastLine = src;
+    src.onended = () => { if (this.lastLine === src) this.lastLine = null; };
     return buf.duration;
+  }
+
+  private lastLine: AudioBufferSourceNode | null = null;
+  /** Coupe la réplique en cours (le joueur a fermé le dialogue avant la fin de la voix). */
+  stopLine(): void {
+    try { this.lastLine?.stop(); } catch { /* déjà finie */ }
+    this.lastLine = null;
+  }
+
+  /** Une tronçonneuse (synthétisée) : moteur en dents de scie, régime qui monte quand elle mord. */
+  chainsaw(seconds = 3, gain = 0.5): void {
+    if (!this.ctx || !this.master) return;
+    const t0 = this.ctx.currentTime;
+    const o = this.ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(70, t0);
+    o.frequency.linearRampToValueAtTime(115, t0 + 0.6);
+    o.frequency.setValueAtTime(115, t0 + seconds * 0.45);
+    o.frequency.linearRampToValueAtTime(92, t0 + seconds * 0.55);
+    const lfo = this.ctx.createOscillator();
+    lfo.frequency.value = 23;
+    const lg = this.ctx.createGain();
+    lg.gain.value = 9;
+    lfo.connect(lg).connect(o.frequency);
+    const f = this.ctx.createBiquadFilter();
+    f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 0.7;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(gain, t0 + 0.15);
+    g.gain.setValueAtTime(gain, t0 + seconds - 0.3);
+    g.gain.linearRampToValueAtTime(0, t0 + seconds);
+    o.connect(f).connect(g).connect(this.master);
+    o.start(t0); lfo.start(t0);
+    o.stop(t0 + seconds + 0.05); lfo.stop(t0 + seconds + 0.05);
   }
 
   /** Bruitage ponctuel (public/sfx/<nom>.mp3) ; sinon un son de secours synthétisé. */

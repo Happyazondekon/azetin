@@ -4,7 +4,7 @@ import { LAYER_TRUTH } from '../world/Village';
 // Le rétroviseur arraché du 4×4 : une seconde caméra tournée vers l'arrière,
 // qui voit le calque "vérité" (visages brûlés des Azévi) au lieu du calque "vu".
 export class Mirror {
-  readonly cam = new THREE.PerspectiveCamera(55, 2.4, 0.05, 90);
+  readonly cam = new THREE.PerspectiveCamera(55, 2.4, 0.05, 220);
   raised = 0; // 0 = baissé, 1 = levé (animation)
 
   private rt = new THREE.WebGLRenderTarget(720, 300);
@@ -51,11 +51,15 @@ export class Mirror {
     this.overlayCam.updateProjectionMatrix();
   }
 
-  render(renderer: THREE.WebGLRenderer, scene: THREE.Scene): void {
+  // `hide` : ce que Happy tient en main (le pied-de-biche) ne doit pas apparaître dans le reflet
+  render(renderer: THREE.WebGLRenderer, scene: THREE.Scene, hide?: THREE.Object3D): void {
     if (this.raised < 0.02) return;
+    const was = hide?.visible ?? true;
+    if (hide) hide.visible = false;
     renderer.setRenderTarget(this.rt);
     renderer.render(scene, this.cam);
     renderer.setRenderTarget(null);
+    if (hide) hide.visible = was;
     const auto = renderer.autoClear;
     renderer.autoClear = false;
     renderer.clearDepth();

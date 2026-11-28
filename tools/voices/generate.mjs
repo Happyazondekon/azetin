@@ -80,10 +80,15 @@ async function lines() {
     agossou: { stability: 0.75, similarity_boost: 0.8, style: 0.2 },
   };
   const dir = out('public/voices/lines');
+  // _texts.json : le texte exact de chaque voix déjà générée. Si le texte de la réplique a changé, on la refait.
+  const recFile = join(dir, '_texts.json');
+  const rec = existsSync(recFile) ? JSON.parse(readFileSync(recFile, 'utf8')) : {};
+  const saveRec = () => writeFileSync(recFile, JSON.stringify(rec, null, 1));
   for (const [id, line] of Object.entries(all)) {
     if (id.startsWith('_')) continue;
     const file = join(dir, `${id}.mp3`);
-    if (existsSync(file) && !FORCE) continue;
+    const stale = rec[id] !== undefined && rec[id] !== line.text;
+    if (existsSync(file) && !FORCE && !stale) { if (rec[id] === undefined) { rec[id] = line.text; saveRec(); } continue; }
     const vid = ids[line.who];
     if (!vid) continue;
     process.stdout.write(`voix  ${id} (${line.who})… `);
@@ -92,6 +97,7 @@ async function lines() {
         text: line.text, model_id: 'eleven_multilingual_v2', voice_settings: settings[line.who] ?? { stability: 0.5, similarity_boost: 0.8 },
       }, '?output_format=mp3_44100_64');
       writeFileSync(file, buf);
+      rec[id] = line.text; saveRec();
       console.log(`${Math.round(buf.length / 1024)} Ko`);
     } catch (e) { console.log(`ÉCHEC ${e.message.slice(0, 160)}`); }
     await wait(300);
@@ -111,6 +117,7 @@ async function sfx() {
         text: s.text, duration_seconds: s.seconds, prompt_influence: 0.45, loop: !!s.loop, model_id: 'eleven_text_to_sound_v2',
       }, '?output_format=mp3_44100_64');
       writeFileSync(file, buf);
+      rec[id] = line.text; saveRec();
       console.log(`${Math.round(buf.length / 1024)} Ko`);
     } catch (e) { console.log(`ÉCHEC ${e.message.slice(0, 160)}`); }
     await wait(300);
@@ -133,6 +140,7 @@ async function music() {
     try {
       const buf = await post('/music', { prompt: t.prompt, music_length_ms: t.ms, model_id: 'music_v2', force_instrumental: true }, '?output_format=mp3_44100_64');
       writeFileSync(file, buf);
+      rec[id] = line.text; saveRec();
       console.log(`${Math.round(buf.length / 1024)} Ko`);
     } catch (e) { console.log(`ÉCHEC ${e.message.slice(0, 160)} (la musique demande un forfait qui l'inclut)`); }
   }

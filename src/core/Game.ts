@@ -20,6 +20,7 @@ import type { FireHandle, Glow } from '../world/Fire';
 import { instance, type ModelName, type Models } from '../world/Assets';
 import { markEnding, endingsSeen } from '../ui/Endings';
 import { DEAD, DEAD_GOAL } from '../story/Dead';
+import { JOURNAL, logDialog } from '../story/Journal';
 import { Credits } from '../ui/Credits';
 import { LAYER_SEEN, LAYER_TRUTH } from '../world/Village';
 import LINES from '../story/lines.json';
@@ -74,11 +75,17 @@ export class Game {
   private enemies!: Enemies;
   private viewmodel: Viewmodel;
   private gameOver: GameOver;
+  private mirrorIdleT = 0;
+  private mirrorQuip = false;
+  private hitsLanded = 0;
   private attackCd = 0;
   private lastHurt = -99;
   private shake = 0;
   private owlQte: { t: number; ok: boolean } | null = null;
   private choice: { a: string; onA: () => void; b: string; onB: () => void } | null = null;
+  // dialogue important en cours : le monde attend que le joueur ait lu (E pour avancer)
+  private dlg: { name: string; who: string; pages: string[]; i: number; t: number; at: number; onDone?: () => void } | null = null;
+  private journalKnown = -1;
   private nextMurmur = 0;
   private fill!: THREE.SpotLight;
   private nearT = 0; private nearD = 8; private nearK = 1;
@@ -470,11 +477,26 @@ export class Game {
     this.speak(l.who, l.text, seconds, id);
   }
 
-  private speak(who: string, text: string, seconds = 6, id?: string): void {
+  // Une réplique qui porte l'histoire : elle s'affiche dans une boîte avec le portrait du personnage,
+  // le monde se fige, et le joueur avance avec E. Pendant une cinématique, elle reste en sous-titres.
+  private talk(id: LineId, onDone?: () => void): void {
+    if (this.mode !== 'playing' || this.fb || this.dlg) {
+      this.line(id, 8);
+      if (onDone) setTimeout(onDone, 8000);
+      return;
+    }
+    const l = LINES[id];
+    this.speak(l.who, l.text, 8, id, onDone ?? (() => {}));
+  }
+
+  private speak(who: string, text: string, seconds = 6, id?: string, boxed?: () => void): void {
     const shown = lang() === 'fr' ? ((id && (LINES as Record<string, { fr?: string }>)[id]?.fr) || tr(text)) : text;
     const p = this.world.people[who];
     const name = who === 'happy' ? 'Happy' : who === 'kossi' ? 'Kossi' : who === 'dossi' ? 'Mama Dossi' : who === 'ayaba' ? 'Ayaba' : who === 'radio' ? 'Radio' : who === 'agossou' ? 'Dah Agossou' : who === 'houngbo' ? 'Houngbo' : /^v\d/.test(who) ? 'A villager' : '';
-    this.subtitles(name, shown, seconds);
+    if (id) setFlag('heard_' + id);
+    logDialog(name, shown);
+    if (boxed !== undefined) this.openDialog(who, name, shown, boxed);
+    else this.subtitles(name, shown, seconds);
     const d = p ? p.root.position.distanceTo(this.player.pos) : 0;
     const gain = who === 'happy' ? 1.1 : who === 'radio' ? 0.8 : Math.max(1.0, 1.6 - d / 25) * (p?.def.azevi ? 1.25 : 1);
     this.talkUntil = this.time + seconds; // la musique se baisse pendant qu'on parle
@@ -485,10 +507,54 @@ export class Game {
       else if (p) this.audio.voiceMix(text, p.def.child ? 'c' : p.def.sex, { gain, pan, ghost: p.def.azevi, rate: p.def.child ? 1.05 : 1 });
     };
     if (!id) return fallback();
-    void this.audio.playLine(id, { gain, pan, ghost: !!p?.def.azevi, radio: who === 'radio' }).then((dur) => {
+    void this.audio.playLine(id, { gain, pan, ghost: !!p?.def.azevi, radio: who === 'radio', text }).then((dur) => {
       if (!dur) fallback();
-      else if (dur + 0.6 > seconds) this.subtitles(name, shown, dur + 0.6); // le sous-titre suit la durée de la voix
+      else if (boxed === undefined && dur + 0.6 > seconds) this.subtitles(name, shown, dur + 0.6); // le sous-titre suit la durée de la voix
     });
+  }
+
+  private openDialog(who: string, name: string, text: string, onDone: () => void): void {
+    // découpe en pages lisibles (≈ 170 caractères), sur les fins de phrase
+    const parts = text.match(/[^.!?…]+[.!?…]+["”»]?\s*|[^.!?…]+$/g) ?? [text];
+    const pages: string[] = [];
+    for (const part of parts) {
+      if (pages.length && pages[pages.length - 1].length + part.length < 170) pages[pages.length - 1] += part;
+      else pages.push(part);
+    }
+    this.dlg = { name, who, pages: pages.map((x) => x.trim()), i: 0, t: 0, at: performance.now(), onDone };
+    this.hud.setPrompt(null);
+    this.hud.coach(null);
+    this.showDialogPage();
+  }
+
+  private showDialogPage(): void {
+    const d = this.dlg!;
+    const portrait = ['ayaba', 'kossi', 'dossi', 'agossou', 'houngbo'].includes(d.who) ? d.who : null;
+    this.hud.showDialog(d.name, d.pages[d.i], portrait, d.i, d.pages.length);
+  }
+
+  // Le monde est figé ; E, Espace ou un clic avancent (après un court instant, pour ne pas sauter par accident)
+  private updateDialog(dt: number): void {
+    const d = this.dlg!;
+    d.t += dt;
+    const next = this.input.wasPressed('KeyE') || this.input.wasPressed('Space') || this.input.wasPressed('Enter') || this.input.leftClicked;
+    if (!next || performance.now() - d.at < 450) return;
+    if (d.i < d.pages.length - 1) { d.i++; d.t = 0; d.at = performance.now(); this.showDialogPage(); this.audio.sfx('ui_click', { gain: 0.25 }); return; }
+    this.dlg = null;
+    this.hud.hideDialog();
+    this.audio.stopLine();
+    d.onDone?.();
+  }
+
+  // Le journal « Ce que je sais » : une notification à chaque page de l'histoire découverte
+  private checkJournal(): void {
+    const fresh = JOURNAL.filter((st) => !hasFlag('j_' + st.id) && st.known());
+    if (!fresh.length) { this.journalKnown = 0; return; }
+    for (const st of fresh) setFlag('j_' + st.id);
+    if (this.journalKnown < 0) { this.journalKnown = 0; return; } // à l'ouverture d'une sauvegarde : pas d'annonce
+    const n = JOURNAL.filter((st) => st.known()).length;
+    this.phone.notify('story', tr('What I know'), `${tr('New page')} · ${tr(fresh[0].title)}${fresh.length > 1 ? ` +${fresh.length - 1}` : ''} (${n}/${JOURNAL.length})`, 6);
+    this.audio.sfx('ui_click', { gain: 0.35 });
   }
 
   // Sous-titres : une longue réplique défile phrase par phrase
@@ -526,7 +592,7 @@ export class Game {
   private tellRite(): void {
     setFlag('repaired');
     setFlag('riteTold');
-    this.line('kossi_rite_explain', 12);
+    this.talk('kossi_rite_explain');
     this.advance(10);
     this.setObjective('ACT III — The healer. Gather the 3 plants, find the whole truth (5 fragments), then begin the rite at the asen under the station.');
   }
@@ -598,15 +664,17 @@ export class Game {
         use: () => {
           if (!hasFlag('ayaba')) {
             setFlag('ayaba');
-            this.line('ayaba_1', 7);
+            this.talk('ayaba_1');
             this.walk('ayaba', [new THREE.Vector3(-2.3, 0, 22), new THREE.Vector3(-3.4, 0, 14.5), new THREE.Vector3(-12.5, 0, 10.2)]);
             this.setObjective('Follow the girl to the vulcanizer’s workshop.');
           } else if (!hasFlag('sawDossi') && hasFlag('dossi')) {
-            this.line('ayaba_mirror', 7);
+            this.talk('ayaba_mirror');
           } else if (hasFlag('sawDossi') && !hasFlag('sawAyaba')) {
-            this.line('ayaba_know', 7);
+            this.talk('ayaba_know');
           } else {
-            this.line((['ayaba_owl', 'ayaba_grandpa', 'ayaba_station'] as const)[Math.floor(this.time) % 3], 6);
+            // ce qu'elle n'a pas encore raconté d'abord, puis à tour de rôle
+            const left = (['ayaba_grandpa', 'ayaba_owl', 'ayaba_station'] as const).filter((x) => !hasFlag('heard_' + x));
+            this.talk(left[0] ?? (['ayaba_owl', 'ayaba_grandpa', 'ayaba_station'] as const)[Math.floor(this.time) % 3]);
           }
         },
       },
@@ -626,39 +694,44 @@ export class Game {
               setFlag('ayaba');
               ayaba.root.position.set(-12.5, 0, 10.2);
             }
-            this.line('kossi_1', 8);
+            this.talk('kossi_1');
             this.advance(20);
             this.setObjective('Bring Kossi two parts: an inner tube (the old moto-taxi, west) and a patch kit (Mama Dossi’s stall).');
           } else if (story.pieces >= 2 && !hasFlag('act1') && !hasFlag('sawDossi')) {
             this.line('kossi_nag', 4);
             this.hud.say('Kossi: Mama Dossi… did you really look at her? Turn your back to her and raise your mirror (right click).', 6);
           } else if (story.pieces >= 2 && !hasFlag('act1')) {
-            setFlag('act1');
-            story.inventory.push('Machete');
-            this.viewmodel.equip('Machete');
-            this.line('kossi_act1', 11);
-            setTimeout(() => this.endOfAct1(), 11500);
-            this.advance(30);
-            this.setObjective('Act II — Bring power from the old fuel station (east of the village).');
+            const act1 = () => {
+              setFlag('act1');
+              story.inventory.push('Machete');
+              this.viewmodel.equip('Machete');
+              this.talk('kossi_act1', () => setTimeout(() => this.endOfAct1(), 600));
+              this.advance(30);
+              this.setObjective('Act II — Bring power from the old fuel station (east of the village).');
+            };
+            // l'histoire du feu n'est jamais ratée : Kossi la raconte avant d'envoyer Happy à la station
+            if (!hasFlag('kossiStory')) { setFlag('kossiStory'); this.talk('kossi_story', act1); }
+            else act1();
           } else if (story.pieces >= 3 && !hasFlag('repaired')) {
             if (!hasFlag('act2')) {
               // avant minuit, Kossi garde la batterie : on ne quitte pas Azé-tin sans avoir vu ce que la nuit cache
               setFlag('batteryGiven');
-              this.line('kossi_wait', 9);
+              this.talk('kossi_wait');
               this.setObjective('Kossi will fix the car at midnight. Until then, follow the hornbill — learn what happened to Azé-tin.');
             } else {
               // à minuit : la voiture est prête… mais Kossi pose LA question
               if (this.kossiAsking || this.choice) return;
               this.kossiAsking = true;
-              this.line('kossi_ask', 8);
-              setTimeout(() => (this.kossiAsking = false), 7200);
               // E = la voie normale (le rite), R = partir
-              setTimeout(() => this.ask('Tell me how to save Azé-tin.', () => this.tellRite(), 'Just fix my car. I’m leaving.', () => {
-                setFlag('repaired');
-                this.line('kossi_leave_ok', 5);
-                this.advance(20);
-                this.setObjective('Your 4×4 is fixed. Drive away before dawn… if you can live with it.');
-              }), 7000);
+              this.talk('kossi_ask', () => {
+                this.kossiAsking = false;
+                this.ask('Tell me how to save Azé-tin.', () => this.tellRite(), 'Just fix my car. I’m leaving.', () => {
+                  setFlag('repaired');
+                  this.line('kossi_leave_ok', 5);
+                  this.advance(20);
+                  this.setObjective('Your 4×4 is fixed. Drive away before dawn… if you can live with it.');
+                });
+              });
             }
           } else {
             if (hasFlag('repaired') && !hasFlag('riteTold')) {
@@ -668,9 +741,8 @@ export class Game {
             } else if (hasFlag('repaired')) this.line('kossi_why', 4);
             else if (story.pieces >= 1 && !hasFlag('kossiStory')) {
               setFlag('kossiStory');
-              this.line('kossi_story', 14); // l'histoire du feu, racontée à voix basse
               this.world.flameScale[0] = 0.5;
-              setTimeout(() => (this.world.flameScale[0] = 1), 9000);
+              this.talk('kossi_story', () => (this.world.flameScale[0] = 1)); // l'histoire du feu, racontée à voix basse
             } else this.line('kossi_nag', 5);
           }
         },
@@ -699,13 +771,12 @@ export class Game {
           }
           if (!hasFlag('dossi')) {
             setFlag('dossi');
-            this.line('dossi_1', 7);
             // E = refuser (la voie sûre), R = manger : on ne mange jamais chez les morts
-            this.ask('Politely refuse', () => {
+            this.talk('dossi_1', () => this.ask('Politely refuse', () => {
               this.line('dossi_refuse', 6);
               setFlag('patch');
               this.gain('Patch kit', 'happy_patch', 5500);
-            }, 'Eat the akassa', () => this.akassaEnding());
+            }, 'Eat the akassa', () => this.akassaEnding()));
           } else if (!hasFlag('sawDossi')) {
             this.line('dossi_stare', 4);
           } else {
@@ -1386,7 +1457,7 @@ export class Game {
       story.inventory.push('Calabash (kaolin)');
       this.audio.sfx('kaolin', { gain: 0.5 });
       this.hud.say('Dah Agossou’s calabash. Full of white earth. — Press Q (A on AZERTY) to throw kaolin.', 6);
-      setTimeout(() => this.line('agossou_calabash', 11), 3500);
+      setTimeout(() => this.talk('agossou_calabash'), 3500);
       this.advance(20);
       this.setObjective('Search the old fuel station, east. The truth is in the ashes.');
       return;
@@ -1432,6 +1503,11 @@ export class Game {
     this.mode = 'cine';
     const top = new THREE.Vector3(0, 2.15, -20);
     const ayaba = this.world.people['ayaba'];
+    // Ayaba est toujours là pour expliquer Loko : c'est le cœur de l'histoire
+    if (ayaba && ayaba.root.visible && ayaba.root.position.distanceTo(top) >= 7.5) {
+      ayaba.root.position.set(2.4, 0, -16.6);
+      ayaba.root.rotation.y = Math.atan2(-2.4, -3.4);
+    }
     const from = this.camera.position.clone();
     this.hornbill.position.set(-14, 9, -30);
     this.hornbill.visible = true;
@@ -1450,19 +1526,109 @@ export class Game {
         this.camera.position.copy(from);
         this.camera.lookAt(top.x, top.y - 0.4 + (1 - e) * 2, top.z);
         at('cry', 4.6, t, () => this.audio.sfx('hornbill', { gain: 1.2 }));
-        at('ay', 1, t, () => { if (ayaba && ayaba.root.position.distanceTo(top) < 8) this.line('ayaba_stump', 8); });
-        at('ag', 9.5, t, () => { this.line('agossou_stump', 11); this.world.flameScale[0] = Math.max(this.world.flameScale[0], 0.22); });
+        at('ay', 1, t, () => this.line('ayaba_stump', 9));
+        at('ag', 10.5, t, () => { this.line('agossou_stump', 10); this.world.flameScale[0] = Math.max(this.world.flameScale[0], 0.22); });
       },
       end: () => {
         if (done) return;
         done = true;
         this.hornbill.position.set(0.2, 2.1, -20.4);
         this.hornbill.rotation.y = Math.PI * 0.85;
-        this.mode = 'playing';
-        this.advance(15);
-        this.setObjective('Find Dah Agossou’s calabash in his house, north, by the lagoon.');
+        // puis le souvenir de l'arbre : l'interdiction de Dah Agossou (obligatoire, ~11 s)
+        this.forbidFlashback(() => {
+          this.mode = 'playing';
+          this.advance(15);
+          this.setObjective('Find Dah Agossou’s calabash in his house, north, by the lagoon.');
+          setTimeout(() => this.line('happy_forbid_after', 5), 700);
+        });
       },
-    });
+    }, false);
+  }
+
+  // Flashback de la souche : Loko debout, au dernier soir. Dah Agossou se dresse devant le tronc,
+  // Houngbo donne l'ordre, la tronçonneuse démarre. On ne peut pas passer ce souvenir.
+  private forbidFlashback(after: () => void): void {
+    const w = this.world;
+    const cam = this.camera;
+    const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+    const added: THREE.Object3D[] = [];
+    const people: Person[] = [];
+    const stump = this.scene.children.find((o) => Math.abs(o.position.x) < 0.1 && Math.abs(o.position.z + 20) < 0.1 && o.position.y === 0);
+    const minutes = story.minutes;
+    this.director.fadeTo(1, 0.6);
+    setTimeout(() => {
+      // l'iroko, immense
+      const tree = instance(this.models, 'tr-mango', 2.2);
+      if (tree) { tree.position.set(0, 0, -20); tree.rotation.y = 0.4; this.scene.add(tree); added.push(tree); }
+      if (stump) stump.visible = false;
+      this.hornbill.visible = false;
+      // la lumière chaude d'une fin d'après-midi, de face : on doit voir les visages
+      const key = new THREE.PointLight(0xffc48a, 90, 26, 1.6);
+      key.position.set(3.5, 4.5, -10.5);
+      const rim = new THREE.PointLight(0xff8a4a, 40, 18, 1.6);
+      rim.position.set(-4, 3, -15);
+      this.scene.add(key, rim);
+      added.push(key, rim);
+      const ag = buildPerson(this.models, { id: 'agossou_fb', sex: 'm', height: 1.74, skin: '#3a2618', top: 'bomba', wax: ['#efe9dc', '#d8d0c0', '#c8bfae'],
+        pants: '#e8e2d4', beard: true, azevi: false, pose: 'Idle_Talking_Loop' });
+      if (ag) { ag.root.position.set(0, 0, -17.6); ag.root.rotation.y = 0; this.scene.add(ag.root); added.push(ag.root); people.push(ag); }
+      const men = [V(-2.6, 0, -12.5), V(-1.2, 0, -11.8)].map((p, i) => {
+        const { elder: _e, ...look } = randomLook(`saw${i}`, 'm');
+        const m = buildPerson(this.models, { ...look, id: `saw${i}`, azevi: false, pose: 'Idle_Loop' });
+        if (m) { m.play('Walk_Loop', 0); m.root.position.copy(p); this.scene.add(m.root); added.push(m.root); people.push(m); }
+        return m;
+      });
+      const h = this.houngbo;
+      const hv = h ? { p: h.root.position.clone(), r: h.root.rotation.y, v: h.root.visible } : null;
+      const weapon = this.viewmodel.current;
+      this.viewmodel.equip(null);
+      if (h) { h.root.position.set(3.2, 0, -12.2); h.root.rotation.y = Math.atan2(-3.2, -7.8); h.root.visible = true; h.play('Idle_Talking_Loop', 0.2); }
+      this.renderer.domElement.classList.add('flashback');
+      this.audio.loop('drone', 0);
+      this.director.fadeTo(0, 1.2);
+      this.director.title('TEN YEARS AGO', 'THE LAST DAY OF LOKO', 3.5);
+      const fired = new Set<string>();
+      const at = (k: string, t: number, now: number, f: () => void) => { if (now >= t && !fired.has(k)) { fired.add(k); f(); } };
+      let done = false;
+      this.mode = 'cine';
+      this.director.play({
+        duration: 12,
+        update: (t, dt) => {
+          story.minutes = 19 * 60 + 2; // le soleil couchant d'il y a dix ans
+          for (const p of people) p.update(dt);
+          h?.update(dt);
+          // la caméra recule pour montrer tout l'arbre, puis se pose sur Dah Agossou
+          if (t < 6) { cam.position.copy(V(3.0, 1.4, -1.5).lerp(V(2.6, 1.5, -4.5), t / 6)); cam.lookAt(0, 4.2 - t * 0.4, -19); }
+          else { cam.position.copy(V(1.3, 1.62, -13.0).lerp(V(0.8, 1.6, -14.3), (t - 6) / 6)); cam.lookAt(0, 1.5, -17.6); }
+          // les hommes à la tronçonneuse avancent vers l'arbre
+          men.forEach((m, i) => {
+            if (!m) return;
+            const target = V(-0.9 + i * 0.5, 0, -16.3 - i * 0.3);
+            const d = target.clone().sub(m.root.position); d.y = 0;
+            if (d.length() > 0.2 && t > 1.5) { m.root.position.addScaledVector(d.normalize(), dt * 1.1); m.root.rotation.y = Math.atan2(d.x, d.z); }
+            else if (t > 1.5) m.play('Interact', 0.2);
+          });
+          at('ag', 1.2, t, () => this.line('agossou_forbid', 5));
+          at('h', 6.2, t, () => this.line('houngbo_cut', 2));
+          at('saw', 7.4, t, () => this.audio.chainsaw(4.2, 0.45));
+          at('crack', 10.6, t, () => { this.audio.sfx('impact', { gain: 1, rate: 0.5 }); this.shake = 0.5; this.director.fadeTo(1, 0.9); });
+        },
+        end: () => {
+          if (done) return;
+          done = true;
+          for (const o of added) this.scene.remove(o);
+          if (stump) stump.visible = true;
+          this.hornbill.visible = true;
+          if (h && hv) { h.root.position.copy(hv.p); h.root.rotation.y = hv.r; h.root.visible = hv.v; }
+          story.minutes = minutes;
+          this.viewmodel.equip(weapon);
+          this.renderer.domElement.classList.remove('flashback');
+          this.director.fadeTo(0, 1.2);
+          after();
+        },
+      }, false);
+      void w;
+    }, 700);
   }
 
   // ================================================================ FLASHBACK — LA NUIT DU FEU (un film, puis une fuite jouable)
@@ -1665,6 +1831,7 @@ export class Game {
         at('party', 1.5, t, () => this.line('flash_party', 6));
         at('chief', 7.6, t, () => { this.line('houngbo_feast', 5); this.audio.voiceMix('ha ha ha ha', 'm', { gain: 0.6, rate: 0.85 }); });
         at('ag', 13, t, () => this.line('agossou_feast', 6));
+        at('warn', 18.6, t, () => this.line('agossou_tape', 7));
         // la lampe se balance… puis tombe sur la pile, rebondit et se brise au sol
         if (fest.lamp && t > 17 && lampFall < 0) {
           fest.lamp.rotation.z = Math.sin(t * 2.2) * 0.08 * Math.min(1, (t - 17) / 2);
@@ -1720,7 +1887,7 @@ export class Game {
         if (!fired.has('boom')) { w.fx.explode(new THREE.Vector3(38, 1.2, -5), 1.5); fest.fires.push(w.fx.add(new THREE.Vector3(38, 0, -5), 6, { smoke: true })); }
         this.startEscape();
       },
-    });
+    }, false); // le souvenir du feu : on ne le passe pas
   }
 
   // La fuite : on est Ayaba, le village brûle, il faut atteindre la lagune
@@ -2841,7 +3008,9 @@ export class Game {
     if (this.mode === 'menu') this.updateMenuCamera();
     else if (this.mode === 'playing') {
       if (this.phone.viewerOpen) this.hud.setPrompt(null); // lecture d'une preuve : tout est figé
+      else if (this.dlg) this.updateDialog(dt);
       else this.updatePlaying(dt);
+      this.checkJournal();
     }
     else if (this.mode === 'cine') {
       if (this.input.wasPressed('Space')) this.director.userSkip();
@@ -2861,7 +3030,7 @@ export class Game {
     if (this.mode === 'playing' && this.mirror.raised >= 0.02) {
       // le cadre du rétroviseur est dessiné directement à l'écran : il garde son propre rendu de tons
       this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      this.mirror.render(this.renderer, this.scene);
+      this.mirror.render(this.renderer, this.scene, this.viewmodel.group);
       this.renderer.toneMapping = THREE.NoToneMapping;
     }
     if (this.mode === 'dead') this.camera.position.y = Math.max(0.35, this.camera.position.y - dt * 1.2); // Happy s'effondre
@@ -2973,7 +3142,7 @@ export class Game {
       const r = this.mirror.raised;
       this.mirror.raised = 1;
       this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      this.mirror.render(this.renderer, this.scene);
+      this.mirror.render(this.renderer, this.scene, this.viewmodel.group);
       this.renderer.toneMapping = THREE.NoToneMapping;
       this.mirror.raised = r;
     } catch { /* pas grave */ }
@@ -3048,6 +3217,14 @@ export class Game {
     const wantMirror = this.lens < 0.3 && this.input.rightDown && locked && !this.phone.open && !this.fb && story.inventory.includes('Rear-view mirror');
     this.mirror.update(dt, wantMirror, this.camera.position, this.player.yaw, this.player.pitch);
     this.updateLens(dt, locked);
+    // rétroviseur levé alors qu'il n'y a rien d'étrange à voir : Happy explique à quoi il sert (une seule fois)
+    if (this.mirror.raised > 0.8 && !this.mirrorQuip && !this.owlQte && !hasFlag('patch') && !hasFlag('sawDossi')) {
+      this.mirrorIdleT += dt;
+      if (this.mirrorIdleT > 1.6) {
+        this.mirrorQuip = true;
+        this.hud.say('Happy: Just the road behind me. Nothing strange here… Maybe this only shows the truth near the villagers.', 6);
+      }
+    } else if (this.mirror.raised < 0.3) this.mirrorIdleT = 0;
     if (this.mirror.raised > 0.8 && !hasFlag('sawDossi') && hasFlag('patch')) this.checkDossiInMirror();
     this.nameTheDead(dt);
     this.coachHints(locked);
@@ -3097,6 +3274,7 @@ export class Game {
         this.strikePeople(dir, weapon.range);
         const hits = this.enemies.strike(this.player.pos, dir, weapon.range, weapon.power);
         if (hits.length) {
+          this.hitsLanded += hits.length;
           this.shake = Math.max(this.shake, 0.18);
           this.audio.thud();
           for (const h of hits) { this.sparks.burst(h, 30 + 15 * weapon.power); this.audio.grunt('m', true, 0.8, this.panOf(h)); }
@@ -3149,9 +3327,9 @@ export class Game {
         this.owlQte = null;
         if (q.ok) this.hud.say(this.mirror.raised > 0.5 ? 'Happy: In the mirror… someone walked past behind me. Burning.' : 'Happy: …It passed. Whatever it was.', 5);
         else {
-          const behind = this.player.forward(this.v2).multiplyScalar(-13).add(this.player.pos);
+          const behind = this.player.forward(this.v2).multiplyScalar(this.hitsLanded < 3 ? -18 : -13).add(this.player.pos);
           this.enemies.spawn(behind, true, 'chase');
-          this.hud.say('Footsteps. Running. Behind you.', 4);
+          this.hud.say('Footsteps. Running. Behind you. — Turn and strike it, or run back to the 4×4.', 5);
         }
       }
     }
@@ -3305,6 +3483,17 @@ export class Game {
       const d = this.v2.copy(this.world.points.dossi).sub(this.player.pos); d.y = 0;
       if (d.length() < 12) {
         this.hud.coach(this.mirror.raised > 0.5 ? null : 'Right click', this.mirror.raised > 0.5 ? '' : 'Hold to raise the mirror — turn your back on her');
+        return;
+      }
+    }
+    // 1b) un Brûlé court sur Happy : dire quoi faire (frapper, ou se réfugier dans le 4×4) tant qu'il n'a pas pris l'habitude
+    if (this.hitsLanded < 6) {
+      const pp = this.player.pos;
+      const chaser = this.enemies.list.find((e) => (e.state === 'chase' || e.state === 'windup') && e.pos.distanceTo(pp) < 18);
+      if (chaser) {
+        if (this.mirror.raised > 0.3) this.hud.coach('Right click', 'Lower the mirror — you cannot strike with it up');
+        else if (!this.viewmodel.current && story.inventory.includes('Tire iron')) this.hud.coach('Left click', 'Strike it: 3 hits make it flee. Or run to the 4×4.', '1', 'Take the tire iron');
+        else this.hud.coach('Left click', 'Strike it: 3 hits make it flee. Or run to the 4×4.');
         return;
       }
     }

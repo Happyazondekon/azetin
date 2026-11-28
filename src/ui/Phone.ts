@@ -3,6 +3,7 @@ import { story, clockText, hasFlag } from '../story/State';
 import { PLACES, PATHS, STEPS, currentStep } from '../story/Places';
 import { endingsSeen, ENDINGS } from './Endings';
 import { DEAD, DEAD_GOAL } from '../story/Dead';
+import { JOURNAL, DIALOG_LOG, knownCount } from '../story/Journal';
 
 // =============================================================
 //  Le smartphone de Happy (touche Tab). Un vrai téléphone : barre d'état, îlot,
@@ -25,10 +26,11 @@ export interface PhoneActions {
   where(): { x: number; z: number; yaw: number; target: { x: number; z: number } | null };
 }
 
-type Screen = 'home' | 'map' | 'notes' | 'photos' | 'photo' | 'messages' | 'thread' | 'memos' | 'bag' | 'endings' | 'settings' | 'pause' | 'phone' | 'camera';
+type Screen = 'home' | 'map' | 'story' | 'notes' | 'photos' | 'photo' | 'messages' | 'thread' | 'memos' | 'bag' | 'endings' | 'settings' | 'pause' | 'phone' | 'camera';
 
 // Icônes (SVG en ligne, blanc sur dégradé) — dessinées pour le jeu
 const ICON: Record<string, string> = {
+  story: '<path d="M5 4.5h6.2c.5 0 .8.4.8.8v14.2c-.6-.6-1.4-.9-2.3-.9H5zM19 4.5h-6.2c-.5 0-.8.4-.8.8v14.2c.6-.6 1.4-.9 2.3-.9H19z" fill="#fff"/><path d="M7 8h3M7 10.5h3M14 8h3M14 10.5h3" stroke="#c2410c" stroke-width="1.2" stroke-linecap="round"/>',
   map: '<path d="M12 2.5c-3.6 0-6.5 2.8-6.5 6.4 0 4.6 6.5 12.6 6.5 12.6s6.5-8 6.5-12.6c0-3.6-2.9-6.4-6.5-6.4z" fill="#fff"/><circle cx="12" cy="9" r="2.4" fill="#2f9e5a"/>',
   notes: '<rect x="5" y="4" width="14" height="16" rx="2" fill="#fff"/><path d="M8 9h8M8 12.5h8M8 16h5" stroke="#e8b62c" stroke-width="1.6" stroke-linecap="round"/>',
   photos: '<g transform="translate(12 12)">' + [0, 45, 90, 135, 180, 225, 270, 315].map((a, i) => `<ellipse rx="2.6" ry="5.6" transform="rotate(${a}) translate(0 -4.6)" fill="${['#f4a52a', '#f06a3a', '#e0457a', '#a356d8', '#4d7ef0', '#3cb4e6', '#46c27a', '#c6d83a'][i]}" opacity="0.92"/>`).join('') + '</g>',
@@ -41,6 +43,7 @@ const ICON: Record<string, string> = {
   camera: '<rect x="3.5" y="7" width="17" height="12" rx="2.5" fill="#fff"/><path d="M9 7l1.3-2h3.4L15 7" fill="#fff"/><circle cx="12" cy="13" r="3.4" fill="#4a4f58"/><circle cx="12" cy="13" r="2" fill="#9aa3af"/>',
 };
 const GRAD: Record<string, string> = {
+  story: 'linear-gradient(160deg,#ff8a3d,#b4320c)',
   map: 'linear-gradient(160deg,#58d083,#2f9e5a)', notes: 'linear-gradient(160deg,#ffd75a,#e8b62c)', photos: 'linear-gradient(160deg,#ffffff,#e9eaee)',
   messages: 'linear-gradient(160deg,#6ef08a,#2fbf4f)', memos: 'linear-gradient(160deg,#ff6a5c,#d93a2e)', bag: 'linear-gradient(160deg,#b98a5a,#7a5230)',
   endings: 'linear-gradient(160deg,#3a2a4a,#150d1e)', settings: 'linear-gradient(160deg,#9aa0a8,#5c636c)', phone: 'linear-gradient(160deg,#6ef08a,#2fbf4f)',
@@ -48,7 +51,7 @@ const GRAD: Record<string, string> = {
 };
 const UI = `${import.meta.env.BASE_URL}ui/`;
 const APPS: [Screen, string, string][] = [
-  ['map', 'Maps', 'map'], ['notes', 'Notes', 'notes'], ['photos', 'Photos', 'photos'], ['memos', 'Voice Memos', 'memos'],
+  ['story', 'What I know', 'story'], ['map', 'Maps', 'map'], ['notes', 'Notes', 'notes'], ['photos', 'Photos', 'photos'], ['memos', 'Voice Memos', 'memos'],
   ['bag', 'Bag', 'bag'], ['endings', 'Azé-tin', 'endings'], ['settings', 'Settings', 'settings'],
 ];
 const DOCK: [Screen, string][] = [['phone', 'phone'], ['messages', 'messages'], ['camera', 'camera'], ['map', 'map']];
@@ -57,7 +60,7 @@ const DOCK: [Screen, string][] = [['phone', 'phone'], ['messages', 'messages'], 
 const FRAGS: { id: string; title: string; text: string }[] = [
   { id: 'photo', title: 'Before — the felled iroko', text: 'Men with chainsaws around the sacred tree. In the middle, the chief, smiling. On the back: “Loko — the last day”.' },
   { id: 'notebook', title: 'The chief’s debts', text: 'Every page in red ink. The last line: “Paid in full — by the barrels.”' },
-  { id: 'tape', title: 'The healer’s warning', text: '“Without Loko, the fire will have no roof! Houngbo, you are selling our ancestors…”' },
+  { id: 'tape', title: 'The healer’s warning', text: '“Without Loko, there will be no funerals in Azé-tin! Houngbo, you are selling our ancestors…”' },
   { id: 'register', title: 'Three hundred barrels', text: '300 barrels of 200 L, delivered the week of the festival. Signed: H.' },
   { id: 'drawing', title: 'The owl on the roof', text: 'A child’s drawing: the tree, the houses, and a big black owl sitting on the chief’s roof.' },
 ];
@@ -76,7 +79,7 @@ const ANALYSIS: Record<string, { tags: [number, number, string][]; found: [strin
   },
   tape: {
     tags: [[78, 34, 'Label'], [80, 55, 'Cassette'], [91, 70, 'Tape']],
-    found: [['Label', '“Dah A. — village”: Dah Agossou, the healer.'], ['Audio', 'Transcript: “Without Loko, the fire will have no roof!”'],
+    found: [['Label', '“Dah A. — village”: Dah Agossou, the healer.'], ['Audio', 'Transcript: “Without Loko, there will be no funerals in Azé-tin!”'],
       ['Voice', 'An old man, angry. Then shouting. Then silence.']],
   },
   register: {
@@ -350,6 +353,21 @@ export class Phone {
         html = `${this.nav('Maps')}<canvas class="ph-map" width="272" height="400"></canvas>
           <p class="ph-empty">Offline map. Places appear as you discover them. Orange ring: your objective.</p>`;
         break;
+      case 'story': {
+        const n = knownCount();
+        html = `${this.nav('What I know')}<p class="ph-sub">${tr('The story of Azé-tin')} · ${n}/${JOURNAL.length}</p>
+          <div class="ph-progress"><i style="width:${Math.round((n / JOURNAL.length) * 100)}%"></i></div>
+          <ul class="ph-jr">${JOURNAL.map((st, i) => {
+          const on = st.known();
+          const q = i === JOURNAL.length - 1 ? ' q' : '';
+          return on
+            ? `<li class="on${q}"><i>${q ? '?' : i + 1}</i><b>${tr(st.title)}</b><span>${tr(st.text)}</span>${st.photo ? `<em class="jr-img" style="background-image:url(${thumb(st.photo)})"></em>` : ''}</li>`
+            : `<li class="off${q}"><i>${q ? '?' : i + 1}</i><b>? ? ?</b><span>· · · · · ·</span></li>`;
+        }).join('')}</ul>
+          <p class="ph-empty">${n >= JOURNAL.length ? tr('You know the whole story now.') : tr('Talk to the villagers, look in the mirror, search the ashes. Each clue fills a page.')}</p>
+          ${DIALOG_LOG.length ? `<h5 class="ph-dead-h">${tr('What they told me')}</h5><ul class="ph-log">${DIALOG_LOG.map((l) => `<li>${l.name ? `<b>${tr(l.name)}</b>` : ''}${l.text}</li>`).join('')}</ul>` : ''}`;
+        break;
+      }
       case 'notes': {
         const cur = currentStep().index;
         const act = hasFlag('act2') ? 'Act III — The night of the Azévi' : hasFlag('act1') ? 'Act II — The station' : 'Act I — The village';

@@ -10,8 +10,8 @@
   },
   "prologue_call": {
     "who": "happy",
-    "text": "Mum, it's me. I'm almost at Papa's village... The GPS lost the signal an hour ago. It's just red dirt and palm trees now. I'll call you when I get th— what is that?!",
-    "fr": "Maman, c'est moi. J'arrive presque au village de Papa... Le GPS a perdu le signal il y a une heure. Il n'y a plus que de la terre rouge et des palmiers. Je t'appelle quand j'arr— c'est quoi, ça ?!"
+    "text": "Mum, it's me. I'm almost at Papa's village... Azé-tin. The GPS died an hour ago. It's just red dirt and palm trees now. I'll call you when I get th— what is that?!",
+    "fr": "Maman, c'est moi. J'arrive bientôt au village de Papa… Azé-tin. Le GPS a lâché il y a une heure. Il n'y a plus que de la terre rouge et des palmiers. Je t'appelle quand j'arr— c'est quoi, ça ?!"
   },
   "prologue_flat": {
     "who": "happy",
@@ -35,33 +35,33 @@
   },
   "ayaba_appear": {
     "who": "ayaba",
-    "text": "Don't read them out loud. They can hear you.",
-    "fr": "Ne les lis pas à voix haute. Ils peuvent t'entendre."
+    "text": "Don't read their names out loud. They can hear you.",
+    "fr": "Ne lis pas leurs noms à voix haute. Ils t'entendent."
   },
   "ayaba_1": {
     "who": "ayaba",
-    "text": "You are looking for Kossi. Everybody who arrives here is looking for Kossi. Come. And don't talk to the others.",
-    "fr": "Tu cherches Kossi. Tous ceux qui arrivent ici cherchent Kossi. Viens. Et ne parle pas aux autres."
+    "text": "You're looking for Kossi. Everyone who arrives here is looking for Kossi. Come. And don't answer the others.",
+    "fr": "Tu cherches Kossi. Tous ceux qui arrivent ici cherchent Kossi. Viens. Et ne réponds pas aux autres."
   },
   "ayaba_mirror": {
     "who": "ayaba",
-    "text": "Mama Dossi gave you food? Take your car mirror. Turn your back to her. Look at her in the glass.",
-    "fr": "Mama Dossi t'a donné à manger ? Prends le rétroviseur de ta voiture. Tourne-lui le dos. Regarde-la dans le miroir."
+    "text": "Mama Dossi gave you food? Take your car mirror. Turn your back to her and look at her in the glass. The glass doesn't lie.",
+    "fr": "Mama Dossi t'a donné à manger ? Prends le miroir de ta voiture. Tourne-lui le dos et regarde-la dans la glace. La glace ne ment pas."
   },
   "ayaba_know": {
     "who": "ayaba",
-    "text": "Now you know. Some of them are not... here anymore. Don't be afraid of me. Look at me too, if you want.",
-    "fr": "Maintenant tu sais. Certains d'entre eux ne sont plus... là. N'aie pas peur de moi. Regarde-moi aussi, si tu veux."
+    "text": "Now you know. Here, we call them Azévi: the dead who could not leave. Don't be afraid of me. Look at me too, if you want.",
+    "fr": "Maintenant tu sais. Ici, on les appelle les Azévi : les morts qui n'ont pas pu partir. N'aie pas peur de moi. Regarde-moi aussi, si tu veux."
   },
   "ayaba_owl": {
     "who": "ayaba",
     "text": "The owl belongs to the chief. When it screams, you hide. Always.",
-    "fr": "Le hibou appartient au chef. Quand il crie, tu te caches. Toujours."
+    "fr": "Le hibou, c'est celui du chef. Quand il crie, on se cache. Toujours."
   },
   "ayaba_grandpa": {
     "who": "ayaba",
-    "text": "My grandfather was the healer. He had a calabash full of white powder. He said it keeps the fire asleep.",
-    "fr": "Mon grand-père était le guérisseur. Il avait une calebasse pleine de poudre blanche. Il disait qu'elle garde le feu endormi."
+    "text": "My grandfather was the healer, Dah Agossou. His calabash was full of white earth. He said it keeps the fire asleep.",
+    "fr": "Mon grand-père était le guérisseur, Dah Agossou. Sa calebasse était pleine de terre blanche. Il disait que ça endort le feu."
   },
   "ayaba_station": {
     "who": "ayaba",
@@ -70,13 +70,13 @@
   },
   "kossi_1": {
     "who": "kossi",
-    "text": "A flat? I can fix it. But I need an inner tube, a patch kit, and power for my compressor. Go. And don't stay out after midnight.",
-    "fr": "Un pneu crevé ? Je peux le réparer. Mais il me faut une chambre à air, un kit de rustines et du courant pour mon compresseur. Va. Et ne reste pas dehors après minuit."
+    "text": "A flat? I can fix that. But bring me an inner tube, a patch kit, and power for my compressor. Go. And don't stay out after midnight.",
+    "fr": "Une crevaison ? Ça, je peux réparer. Mais il me faut une chambre à air, un kit de rustines, et du courant pour mon compresseur. Va. Et ne traîne pas dehors après minuit."
   },
   "kossi_story": {
     "who": "kossi",
-    "text": "Ten years ago tonight, there was a fête. The chief had cut the sacred iroko to store kpayo, smuggled petrol, hundreds of barrels. I sold him my tyres to roll them. When the fire came... I was the only one who ran fast enough.",
-    "fr": "Il y a dix ans, cette nuit, il y avait une fête. Le chef avait abattu l'iroko sacré pour stocker du kpayo, de l'essence de contrebande, des centaines de fûts. Je lui ai vendu mes pneus pour les rouler. Quand le feu est venu... j'ai été le seul à courir assez vite."
+    "text": "Ten years ago tonight, there was a festival. Houngbo, our chief, made a deal with kpayo smugglers: a station, hundreds of barrels of petrol. To build it, he cut down Loko, the sacred iroko. Dah Agossou had forbidden it. I sold him my tyres to roll the barrels. That night, the fire took sixty-three people. I was the only one who ran fast enough.",
+    "fr": "Il y a dix ans, jour pour jour, il y avait une fête. Houngbo, notre chef, avait fait affaire avec des trafiquants de kpayo : une station, des centaines de fûts d'essence. Pour la construire, il a abattu Loko, l'iroko sacré. Dah Agossou l'avait interdit. Moi, je lui ai vendu mes pneus pour rouler les fûts. Cette nuit-là, le feu a pris soixante-trois personnes. Moi seul, j'ai couru assez vite."
   },
   "kossi_nag": {
     "who": "kossi",
@@ -85,8 +85,8 @@
   },
   "kossi_act1": {
     "who": "kossi",
-    "text": "Good. Now power. The generator at the old station still works... I won't go back there. Take my machete. Here, we don't count the dead anymore. We count the living. Two. You... and me.",
-    "fr": "Bien. Maintenant, le courant. Le groupe électrogène de la vieille station marche encore... Moi, je n'y retourne pas. Prends ma machette. Ici, on ne compte plus les morts. On compte les vivants. Deux. Toi... et moi."
+    "text": "Good. Now the power. The generator at the old station still works... I won't set foot there again. Take my machete. Here, we don't count the dead anymore. We count the living. Two. You... and me.",
+    "fr": "Bien. Maintenant, le courant. Le groupe électrogène de la vieille station marche encore… Moi, je n'y remets plus les pieds. Prends ma machette. Ici, on ne compte plus les morts. On compte les vivants. Deux. Toi… et moi."
   },
   "kossi_repaired": {
     "who": "kossi",
@@ -105,13 +105,13 @@
   },
   "dossi_1": {
     "who": "dossi",
-    "text": "Sit, my child. Eat some akassa. You must be so hungry... Kossi's patch kit? Yes, yes. First, you eat.",
-    "fr": "Assieds-toi, mon enfant. Mange un peu d'akassa. Tu dois avoir si faim... Le kit de rustines de Kossi ? Oui, oui. D'abord, tu manges."
+    "text": "Sit down, my son. Eat a little akassa, eh. You've come a long way... Kossi's patch kit? Yes, yes. First, you eat.",
+    "fr": "Viens t'asseoir, mon fils. Mange un peu d'akassa, hein. Tu as fait la route… Les rustines de Kossi ? Oui, oui. D'abord, tu manges."
   },
   "dossi_ate": {
     "who": "dossi",
-    "text": "Good... good. Now you will stay a little longer. Here. Your little box.",
-    "fr": "Bien... bien. Maintenant tu vas rester un peu plus longtemps. Tiens. Ta petite boîte."
+    "text": "Good... good. Now you will stay with us a little longer. Here. Your little box.",
+    "fr": "C'est bien… c'est bien. Maintenant, tu vas rester un peu avec nous. Tiens. Ta petite boîte."
   },
   "dossi_refuse": {
     "who": "dossi",
@@ -126,7 +126,7 @@
   "dossi_know": {
     "who": "dossi",
     "text": "You looked in your little glass, eh? Then you know why nobody leaves.",
-    "fr": "Tu as regardé dans ton petit miroir, hein ? Alors tu sais pourquoi personne ne part."
+    "fr": "Tu as regardé dans ton petit miroir, hein ? Alors tu sais pourquoi personne ne part d'ici."
   },
   "happy_tube": {
     "who": "happy",
@@ -135,8 +135,8 @@
   },
   "happy_ate": {
     "who": "happy",
-    "text": "It tasted... cold. Like it was cooked a long time ago.",
-    "fr": "Ça avait un goût... froid. Comme si ça avait été cuit il y a très longtemps."
+    "text": "It tasted... cold. Like it was cooked ten years ago.",
+    "fr": "C'était… froid. Comme si ça avait été cuisiné il y a dix ans."
   },
   "happy_patch": {
     "who": "happy",
@@ -146,7 +146,7 @@
   "happy_mirror_dossi": {
     "who": "happy",
     "text": "Her face... In the mirror, her face is burned.",
-    "fr": "Son visage... Dans le miroir, son visage est brûlé."
+    "fr": "Son visage… Dans le miroir, son visage est brûlé."
   },
   "happy_mirror_ayaba": {
     "who": "happy",
@@ -195,8 +195,8 @@
   },
   "radio_news": {
     "who": "radio",
-    "text": "...and tonight we remember. Ten years ago, in the village of Azé-tin, an illegal fuel depot exploded during a festival. Sixty-three people died, among them the village chief, Houngbo, and the healer, Dah Agossou. The village was never... the village was never buried.",
-    "fr": "...et ce soir, nous nous souvenons. Il y a dix ans, au village d'Azé-tin, un dépôt de carburant illégal a explosé pendant une fête. Soixante-trois personnes sont mortes, parmi elles le chef du village, Houngbo, et le guérisseur, Dah Agossou. Le village n'a jamais... le village n'a jamais été enterré."
+    "text": "...and tonight we remember. Ten years ago, in the village of Azé-tin, an illegal kpayo depot exploded during a festival. Sixty-three dead, among them chief Houngbo and the healer, Dah Agossou. The victims never received their funeral rites.",
+    "fr": "…et ce soir, nous nous souvenons. Il y a dix ans, au village d'Azé-tin, un dépôt clandestin de kpayo explosait en pleine fête. Soixante-trois morts, dont le chef Houngbo et le guérisseur, Dah Agossou. Les victimes n'ont jamais reçu leurs funérailles."
   },
   "kossi_machete_ask": {
     "who": "kossi",
@@ -215,23 +215,23 @@
   },
   "ayaba_stump": {
     "who": "ayaba",
-    "text": "This was Loko. The oldest tree. Grandpa said it held the sky above the village. They cut it for the barrels.",
-    "fr": "C'était Loko. Le plus vieil arbre. Grand-père disait qu'il tenait le ciel au-dessus du village. Ils l'ont coupé pour les fûts."
+    "text": "This was Loko, the great iroko. Grandpa said no funeral can be done without Loko. They cut it for the barrels. So when the fire came... our dead had no rites. They stayed.",
+    "fr": "Ici, c'était Loko, le grand iroko. Grand-père disait que sans Loko, on ne peut pas faire de funérailles. Ils l'ont coupé pour les fûts. Alors quand le feu est venu… nos morts n'ont eu aucun rite. Ils sont restés."
   },
   "agossou_stump": {
     "who": "agossou",
     "text": "A living one... can finish what I began. My calabash waits in my house, by the water. Take the white earth. The burnt ones still fear it.",
-    "fr": "Un vivant... peut finir ce que j'ai commencé. Ma calebasse attend dans ma maison, au bord de l'eau. Prends la terre blanche. Les brûlés la craignent encore."
+    "fr": "Un vivant… peut achever ce que j'ai commencé. Ma calebasse t'attend dans ma case, au bord de l'eau. Prends la terre blanche. Les brûlés la craignent encore."
   },
   "agossou_calabash": {
     "who": "agossou",
-    "text": "Kaolin. Throw it, and they remember that they are dead. Fill it again at my asen. Now go read the ashes. The truth is at the station.",
-    "fr": "Le kaolin. Lance-le, et ils se souviennent qu'ils sont morts. Remplis-la à mon asen. Maintenant va lire les cendres. La vérité est à la station."
+    "text": "Kaolin. Throw it, and they remember they are dead. Refill it at my asen. Now go and read the ashes. The truth is at the station.",
+    "fr": "Le kaolin. Lance-le, et ils se souviennent qu'ils sont morts. Remplis la calebasse à mon asen. Maintenant, va lire les cendres. La vérité est à la station."
   },
   "agossou_tape": {
     "who": "agossou",
-    "text": "Without Loko, the fire will have no roof! Houngbo, you are selling our ancestors for a few barrels of petrol!",
-    "fr": "Sans Loko, le feu n'aura plus de toit ! Houngbo, tu vends nos ancêtres pour quelques fûts d'essence !"
+    "text": "Without Loko, there will be no funerals in Azé-tin! Houngbo, you are selling our ancestors for a few barrels of petrol!",
+    "fr": "Sans Loko, il n'y aura plus de funérailles à Azé-tin ! Houngbo, tu vends nos ancêtres pour quelques fûts d'essence !"
   },
   "agossou_flash": {
     "who": "agossou",
@@ -245,23 +245,23 @@
   },
   "happy_frag_photo": {
     "who": "happy",
-    "text": "A photo. Men with chainsaws around a huge tree... and the chief in the middle, smiling.",
-    "fr": "Une photo. Des hommes avec des tronçonneuses autour d'un arbre immense... et le chef au milieu, souriant."
+    "text": "A photo. Men with chainsaws around a huge tree... Loko. And the chief in the middle, smiling.",
+    "fr": "Une photo. Des hommes avec des tronçonneuses autour d'un arbre immense… Loko. Et le chef au milieu, tout sourire."
   },
   "happy_frag_notebook": {
     "who": "happy",
-    "text": "His debt book. Every page in red. The last one says: paid in full... by the barrels.",
-    "fr": "Son carnet de dettes. Chaque page en rouge. La dernière dit : payé en totalité... par les fûts."
+    "text": "Houngbo's debt book. Every page in red. The last one says: paid in full... with the barrels.",
+    "fr": "Le carnet de dettes de Houngbo. Toutes les pages en rouge. La dernière dit : soldé… avec les fûts."
   },
   "happy_frag_register": {
     "who": "happy",
-    "text": "A register. Three hundred barrels. Delivered the week of the festival.",
-    "fr": "Un registre. Trois cents fûts. Livrés la semaine de la fête."
+    "text": "A register. Three hundred barrels of kpayo. Delivered the week of the festival.",
+    "fr": "Un registre. Trois cents fûts de kpayo. Livrés la semaine de la fête."
   },
   "happy_frag_drawing": {
     "who": "happy",
-    "text": "A child's drawing. The tree, the houses... and a big black owl sitting on the chief's roof.",
-    "fr": "Un dessin d'enfant. L'arbre, les maisons... et un gros hibou noir posé sur le toit du chef."
+    "text": "A child's drawing. The tree, the houses... and a big black owl on the chief's roof.",
+    "fr": "Un dessin d'enfant. L'arbre, les cases… et un grand hibou noir sur le toit du chef."
   },
   "happy_frag_tape": {
     "who": "happy",
@@ -275,18 +275,18 @@
   },
   "ayaba_flash_end": {
     "who": "ayaba",
-    "text": "He pushed me into the lagoon. The fire couldn't follow me there. ...But I never came out of the water either.",
-    "fr": "Il m'a poussée dans la lagune. Le feu n'a pas pu m'y suivre. ...Mais je ne suis jamais ressortie de l'eau non plus."
+    "text": "Grandpa pushed me into the lagoon. The fire couldn't follow me there... But I never came out of the water either.",
+    "fr": "Grand-père m'a poussée dans la lagune. Le feu ne pouvait pas m'y suivre… Mais je ne suis jamais ressortie de l'eau non plus."
   },
   "flash_party": {
     "who": "ayaba",
     "text": "It's the festival! Everyone is here. The chief bought drinks for the whole village tonight.",
-    "fr": "C'est la fête ! Tout le monde est là. Le chef a payé à boire à tout le village ce soir."
+    "fr": "C'est la fête ! Tout le monde est là. Ce soir, le chef paie à boire à tout le village."
   },
   "houngbo_offer": {
     "who": "houngbo",
-    "text": "Welcome, traveller. That old fool cursed my village. Burn what is left of his house... and I will let you leave. You have my word.",
-    "fr": "Bienvenue, voyageur. Ce vieux fou a maudit mon village. Brûle ce qu'il reste de sa maison... et je te laisserai partir. Tu as ma parole."
+    "text": "Welcome, traveller. That old fool Agossou cursed my village. Burn what is left of his house... and I will let you leave. You have my word.",
+    "fr": "Bienvenue, étranger. Ce vieux fou d'Agossou a maudit mon village. Brûle ce qui reste de sa case… et je te laisse partir. Tu as ma parole."
   },
   "houngbo_midnight": {
     "who": "houngbo",
@@ -306,17 +306,17 @@
   "agossou_feast": {
     "who": "agossou",
     "text": "Dance, Houngbo. Dance on your barrels. The ancestors are watching you tonight.",
-    "fr": "Danse, Houngbo. Danse sur tes fûts. Les ancêtres te regardent ce soir."
+    "fr": "Danse, Houngbo. Danse sur tes fûts. Ce soir, les ancêtres te regardent."
   },
   "houngbo_feast": {
     "who": "houngbo",
-    "text": "Drink, my people! Tonight, Azé-tin is rich! Tonight, nobody goes to bed!",
-    "fr": "Buvez, mon peuple ! Ce soir, Azé-tin est riche ! Ce soir, personne ne va se coucher !"
+    "text": "Drink, my people! Tonight Azé-tin is rich! Tonight, nobody sleeps!",
+    "fr": "Buvez, mon peuple ! Ce soir, Azé-tin est riche ! Ce soir, personne ne dort !"
   },
   "houngbo_thanks": {
     "who": "houngbo",
-    "text": "Thank you, traveller. Now my village will never be judged. And neither will I.",
-    "fr": "Merci, voyageur. Maintenant mon village ne sera jamais jugé. Et moi non plus."
+    "text": "Thank you, traveller. Now no rite will ever judge my village. Or me.",
+    "fr": "Merci, étranger. Désormais, aucun rite ne jugera mon village. Ni moi."
   },
   "happy_burn": {
     "who": "happy",
@@ -366,7 +366,7 @@
   "ayaba_goodbye": {
     "who": "ayaba",
     "text": "Thank you, Happy. The water is warm now. Tell the next traveller... Kossi is waiting.",
-    "fr": "Merci, Happy. L'eau est chaude maintenant. Dis au prochain voyageur... Kossi l'attend."
+    "fr": "Merci, Happy. L'eau est chaude, maintenant. Dis au prochain voyageur… que Kossi l'attend."
   },
   "happy_mom": {
     "who": "happy",
@@ -390,8 +390,8 @@
   },
   "kossi_ask": {
     "who": "kossi",
-    "text": "Your car is ready. You can leave now... But tell me, traveller. Do you really not want to save Azé-tin?",
-    "fr": "Ta voiture est prête. Tu peux partir maintenant... Mais dis-moi, voyageur. Tu ne veux vraiment pas sauver Azé-tin ?"
+    "text": "Your car is ready. You can leave now... But tell me, traveller. Will you really leave Azé-tin like this?",
+    "fr": "Ta voiture est prête. Tu peux partir… Mais dis-moi, étranger. Tu vas vraiment laisser Azé-tin comme ça ?"
   },
   "kossi_leave_ok": {
     "who": "kossi",
@@ -400,8 +400,8 @@
   },
   "kossi_rite_explain": {
     "who": "kossi",
-    "text": "Then listen. The healer's calabash, the three plants, and the whole truth. Bring them to the asen under the station, and sing. Houngbo will come. Whatever happens... don't stop singing.",
-    "fr": "Alors écoute. La calebasse du guérisseur, les trois plantes, et toute la vérité. Apporte-les à l'asen sous la station, et chante. Houngbo viendra. Quoi qu'il arrive... n'arrête pas de chanter."
+    "text": "Then listen. The healer's calabash, the three plants, and the whole truth. Bring them to the asen under the station and sing. That is the funeral they never had. Houngbo will come. Whatever happens... don't stop singing.",
+    "fr": "Alors écoute. La calebasse du guérisseur, les trois plantes, et toute la vérité. Apporte-les à l'asen sous la station, et chante. Ce sont les funérailles qu'ils n'ont jamais eues. Houngbo viendra. Quoi qu'il arrive… n'arrête pas de chanter."
   },
   "happy_car_doubt": {
     "who": "happy",
@@ -412,5 +412,20 @@
     "who": "agossou",
     "text": "He fooled you too, traveller? Is this really what you want?",
     "fr": "Il t'a berné toi aussi, voyageur ? C'est vraiment ça que tu veux ?"
+  },
+  "agossou_forbid": {
+    "who": "agossou",
+    "text": "Put down that saw! Whoever cuts Loko cuts the road of our dead!",
+    "fr": "Posez cette scie ! Qui coupe Loko coupe la route de nos morts !"
+  },
+  "houngbo_cut": {
+    "who": "houngbo",
+    "text": "Cut it.",
+    "fr": "Coupez."
+  },
+  "happy_forbid_after": {
+    "who": "happy",
+    "text": "He told them. He told them, and they cut it anyway.",
+    "fr": "Il les avait prévenus. Il les avait prévenus, et ils l'ont coupé quand même."
   }
 }
